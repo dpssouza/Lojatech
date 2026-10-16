@@ -66,9 +66,10 @@ document.querySelector('#cart-toggle').addEventListener('click', () => { panel.h
 document.querySelector('#cart-close').addEventListener('click', () => { panel.hidden = true; });
 document.querySelector('#checkout-form').addEventListener('submit', async event => {
   event.preventDefault();
+  const checkoutForm = event.currentTarget;
   checkoutMessage.textContent = '';
   if (!cart.size) { checkoutMessage.textContent = 'Adicione pelo menos um produto ao carrinho.'; return; }
-  const form = new FormData(event.currentTarget);
+  const form = new FormData(checkoutForm);
   const payload = {
     customerName: form.get('customerName'), customerEmail: form.get('customerEmail'),
     items: [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }))
@@ -81,7 +82,7 @@ document.querySelector('#checkout-form').addEventListener('submit', async event 
     if (!response.ok) throw new Error(result.error || 'Não foi possível concluir o pedido.');
     checkoutMessage.textContent = `Pedido #${result.orderId} registrado! Total: ${money(result.total)}.`;
     cart.clear();
-    event.currentTarget.reset();
+    checkoutForm.reset();
     renderCart();
     await loadProducts();
   } catch (error) {
