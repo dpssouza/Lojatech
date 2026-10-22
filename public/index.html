@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Loja virtual didática para praticar Node.js, PostgreSQL e Docker.">
+  <title>LojaTech | Tecnologia para o dia a dia</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="LojaTech página inicial"><span class="brand-mark">L</span> LojaTech</a>
+    <div class="topbar-note">Laboratório de deploy · Node.js + PostgreSQL + Docker</div>
+    <button id="cart-toggle" class="cart-toggle" type="button">Carrinho <span id="cart-count">0</span></button>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="hero-copy"><p class="eyebrow">TECNOLOGIA PARA O SEU DIA</p><h1>Seu próximo upgrade<br><span>começa aqui.</span></h1><p>Uma loja demonstrativa para praticar desenvolvimento web e implantação em nuvem.</p><a class="hero-link" href="#produtos">Explorar produtos ↓</a></div>
+      <div class="hero-art" aria-hidden="true"><div class="hero-circle"></div><div class="hero-device">LT<span>+</span></div><div class="float-card">Tecnologia<br><strong>sem complicação.</strong></div></div>
+    </section>
+    <section id="produtos" class="catalog">
+      <div class="section-heading"><div><p class="eyebrow">NOSSA SELEÇÃO</p><h2>Produtos em destaque</h2></div><p id="product-status" class="status">Carregando produtos...</p></div>
+      <div id="product-grid" class="product-grid"></div>
+    </section>
+  </main>
+  <aside id="cart-panel" class="cart-panel" aria-label="Carrinho de compras" hidden>
+    <div class="cart-heading"><h2>Seu carrinho</h2><button id="cart-close" class="icon-button" type="button" aria-label="Fechar carrinho">×</button></div>
+    <div id="cart-items" class="cart-items"></div>
+    <div class="cart-total"><span>Total</span><strong id="cart-total">R$ 0,00</strong></div>
+    <form id="checkout-form" class="checkout-form"><label for="customer-name">Nome</label><input id="customer-name" name="customerName" required maxlength="120" placeholder="Seu nome"><label for="customer-email">E-mail</label><input id="customer-email" name="customerEmail" type="email" required maxlength="180" placeholder="voce@exemplo.com"><button class="primary-button" type="submit">Finalizar pedido</button><p id="checkout-message" role="status"></p></form>
+  </aside>
+  <footer><span>LojaTech — projeto educacional</span><span>Node.js · Express · PostgreSQL · Docker</span></footer>
+</body>
+</html>

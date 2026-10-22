@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-lojatech}
+      POSTGRES_USER: ${DB_ADMIN_USER:-lojatech}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Defina DB_ADMIN_PASSWORD no arquivo .env}
+      APP_DB_USER: ${DB_USER:-lojatech_app}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./db/create-app-user.sh:/docker-entrypoint-initdb.d/02-create-app-user.sh:ro
+      - ./db/create-app-user.sql:/scripts/create-app-user.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    networks:
+      - appnet
+    security_opt:
+      - no-new-privileges:true
+
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-lojatech}
+      DB_USER: ${DB_USER:-lojatech_app}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+    ports:
+      # Para acesso público em produção, prefira proxy reverso com HTTPS.
+      # Restrinja a porta no Security Group; idealmente não exponha 3000 diretamente.
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - appnet
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    pids_limit: 100
+    mem_limit: 256m
+    cpus: 1.0
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  postgres_data:
