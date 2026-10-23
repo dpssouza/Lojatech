@@ -1,618 +1,954 @@
-# LojaTech — Laboratório de Docker e AWS EC2
+# LojaTech --- Laboratório de Docker e AWS EC2
 
-## Segurança e uso fora do laboratório
+Bem-vindo(a) ao **LojaTech**!
 
-Este projeto é educacional e não deve ser considerado pronto para produção sem uma revisão
-da infraestrutura e testes no ambiente de destino.
+Neste laboratório, você vai aprender, passo a passo, a executar uma
+aplicação web no seu computador e depois publicá-la em uma máquina
+virtual na nuvem usando a AWS EC2.
 
-- Nunca publique `.env`, chaves privadas, tokens ou credenciais. Use `.env.example` apenas com valores fictícios.
-- O servidor exige `DB_USER` e `DB_PASSWORD`; não há usuário ou senha padrão no backend.
-- A API aplica limite de requisições e limite de tamanho do JSON.
-- Em produção, publique por HTTPS com proxy reverso ou balanceador configurado corretamente.
-- Restrinja SSH ao IP administrativo e não exponha a porta 5432 do PostgreSQL.
-- O Compose ainda publica a porta 3000 do host para facilitar o laboratório. Em produção, remova essa publicação se a aplicação estiver atrás de um proxy na mesma rede Docker.
-- As imagens `node` e `postgres` usam tags de versão, não digests imutáveis. Revise e atualize as imagens regularmente.
-- O rate limit por IP depende da configuração de proxy. Defina `TRUST_PROXY=true` somente quando a aplicação estiver atrás de exatamente um proxy confiável; ajuste o número de saltos para sua infraestrutura.
-- A senha em `.env` deve ser forte, exclusiva e rotacionada se já foi compartilhada ou utilizada fora do laboratório.
-- O script `db/init.sql` só inicializa um volume PostgreSQL vazio; alterações nele não migram automaticamente um banco existente.
+Este guia foi escrito para quem está fazendo o primeiro deploy. Não pule
+etapas: copie um comando, execute, confira o resultado e só então
+avance.
 
-### Atualização de uma instalação que já possui volume PostgreSQL
-
-Os scripts em `/docker-entrypoint-initdb.d` são executados somente quando o volume do banco é criado pela primeira vez. Se você já executava uma versão anterior do LojaTech, não apague o volume para aplicar esta alteração.
-
-1. Faça backup do banco.
-2. Defina `DB_ADMIN_USER` e `DB_ADMIN_PASSWORD` com as credenciais administrativas que já funcionam no volume existente.
-3. Defina `DB_USER=lojatech_app` e uma nova senha forte em `DB_PASSWORD`.
-4. Crie o usuário restrito e aplique as permissões do arquivo `db/create-app-user.sql` conectando-se ao banco como administrador. Ao executar manualmente, substitua `:app_user`, `:app_password` e `:db_name` pelos valores reais usando uma ferramenta segura; não publique a senha em comandos compartilhados ou histórico de terminal.
-5. Só então recrie o serviço da aplicação com `docker compose up -d --build app`.
-
-Em uma instalação nova, o script `02-create-app-user.sh` cria o usuário da aplicação automaticamente. Em um volume antigo, o usuário administrativo original pode continuar sendo superusuário; não o remova nem altere suas permissões sem testar e fazer backup.
-
-### Instalação
-
-Copie `.env.example` para `.env`, substitua `DB_PASSWORD` por um segredo forte e execute:
-
-```bash
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100 app
-```
-
-Não envie o `.env` para o GitHub. Para atualizar a aplicação, preserve o volume de dados e faça backup antes de qualquer operação destrutiva.
-
-
-Bem-vindo(a) ao **LojaTech**! Neste projeto, você vai aprender a executar uma aplicação web, entender como ela se conecta a um banco de dados e publicar o projeto em uma máquina virtual na nuvem.
-
-O laboratório foi organizado em etapas. Faça uma de cada vez, execute os comandos na ordem indicada e confira os resultados antes de avançar.
-
-> **Importante:** este é um projeto educacional. Ele não está preparado para uso em produção: não possui autenticação administrativa, pagamento, HTTPS automático nem todas as proteções de segurança necessárias. Use somente dados fictícios.
-
-## O que você vai aprender
-
-Ao concluir o laboratório, você terá praticado:
-
-- **Git e GitHub:** baixar o projeto e publicar o código.
-- **VS Code:** abrir e editar os arquivos.
-- **Docker e Docker Compose:** executar a aplicação e o banco de dados em contêineres.
-- **PostgreSQL:** armazenar produtos e pedidos.
-- **SSH:** conectar-se remotamente a uma máquina Linux.
-- **AWS EC2:** criar uma máquina virtual e disponibilizar a aplicação para teste.
-
-## O que a aplicação faz?
-
-O LojaTech é uma pequena loja virtual didática. Ela:
-
-- apresenta produtos armazenados no PostgreSQL;
-- permite adicionar produtos ao carrinho;
-- registra pedidos com nome e e-mail do cliente;
-- valida produtos, quantidades e estoque no backend;
-- disponibiliza o endereço de verificação `GET /api/health`.
-
-## Como as peças trabalham juntas?
-
-| Peça | Para que serve |
-| --- | --- |
-| Navegador | Exibe a loja para o usuário. |
-| Frontend (HTML, CSS e JavaScript) | Cuida da interface da loja. |
-| Backend (Node.js + Express) | Recebe requisições e aplica as regras da aplicação. |
-| PostgreSQL | Armazena produtos e pedidos. |
-| Docker | Executa cada serviço em um contêiner. |
-| Docker Compose | Inicia e organiza a aplicação e o banco de dados. |
-| AWS EC2 | Hospeda o laboratório em uma máquina virtual na nuvem. |
-
-## Escolha seu ambiente
-
-Você pode executar o projeto de duas formas:
-
-1. **Modo local — recomendado para começar:** executar no seu computador com Docker Desktop (Windows/macOS) ou Docker Engine (Linux).
-2. **Modo nuvem — etapa seguinte:** publicar a aplicação em uma instância Ubuntu na AWS EC2.
-
-> **Sugestão para a aula:** primeiro faça o projeto funcionar localmente. Só depois passe para a EC2. Assim, fica mais fácil descobrir se um problema está na aplicação ou na configuração da nuvem.
+> **Importante:** este é um projeto educacional. Não está preparado para
+> uso em produção. Utilize apenas dados fictícios durante as atividades.
 
 ## Sumário
 
-- [1. Pré-requisitos](#1-pré-requisitos)
-- [2. Baixar o projeto e abrir no VS Code](#2-baixar-o-projeto-e-abrir-no-vs-code)
-- [3. Configurar o arquivo de ambiente](#3-configurar-o-arquivo-de-ambiente)
-- [4. Executar localmente com Docker Compose](#4-executar-localmente-com-docker-compose)
-- [5. Publicar o código no GitHub](#5-publicar-o-código-no-github)
-- [6. Criar a instância EC2](#6-criar-a-instância-ec2)
-- [7. Conectar à EC2 por SSH](#7-conectar-à-ec2-por-ssh)
-- [8. Instalar o Docker na EC2](#8-instalar-o-docker-na-ec2)
-- [9. Executar a aplicação na EC2](#9-executar-a-aplicação-na-ec2)
-- [10. Atualizar a aplicação na EC2](#10-atualizar-a-aplicação-na-ec2)
-- [11. Resolver problemas comuns](#11-resolver-problemas-comuns)
-- [12. Limpar os recursos ao terminar](#12-limpar-os-recursos-ao-terminar)
-- [Estrutura dos arquivos](#estrutura-dos-arquivos)
-- [Desafios para continuar aprendendo](#desafios-para-continuar-aprendendo)
+-   [1. Entender o que vamos montar](#1-entender-o-que-vamos-montar)
+-   [2. Preparar o computador](#2-preparar-o-computador)
+-   [3. Baixar o projeto do GitHub](#3-baixar-o-projeto-do-github)
+-   [4. Configurar as senhas do banco](#4-configurar-as-senhas-do-banco)
+-   [5. Executar a aplicação no
+    computador](#5-executar-a-aplicação-no-computador)
+-   [6. Criar uma máquina virtual na AWS
+    EC2](#6-criar-uma-máquina-virtual-na-aws-ec2)
+-   [7. Conectar à EC2 por SSH](#7-conectar-à-ec2-por-ssh)
+-   [8. Instalar Docker na EC2](#8-instalar-docker-na-ec2)
+-   [9. Publicar a aplicação na EC2](#9-publicar-a-aplicação-na-ec2)
+-   [10. Atualizar a aplicação](#10-atualizar-a-aplicação)
+-   [11. Resolver problemas comuns](#11-resolver-problemas-comuns)
+-   [12. Encerrar o laboratório e evitar
+    custos](#12-encerrar-o-laboratório-e-evitar-custos)
+-   [13. Entender os arquivos do
+    projeto](#13-entender-os-arquivos-do-projeto)
+-   [Referências oficiais](#referências-oficiais)
 
----
+------------------------------------------------------------------------
 
-## 1. Pré-requisitos
+## 1. Entender o que vamos montar
 
-Antes de começar, confira se você tem:
+O LojaTech é uma pequena loja virtual didática. Ela mostra produtos,
+permite adicionar produtos ao carrinho e registra pedidos em um banco de
+dados.
 
-| Ferramenta | Por que precisamos dela? |
-| --- | --- |
-| Git | Para baixar e enviar o código. |
-| Visual Studio Code | Para visualizar e editar os arquivos. |
-| Docker | Para executar a aplicação e o banco em contêineres. |
-| Conta AWS | Necessária somente para a etapa de nuvem. |
+### As peças do projeto
 
-### No Windows
+  -----------------------------------------------------------------------
+  Peça                                Explicação simples
+  ----------------------------------- -----------------------------------
+  Navegador                           O programa usado para abrir sites,
+                                      como Chrome.
 
-1. Instale o **Git** e o **Visual Studio Code**.
-2. Instale o **Docker Desktop**.
-3. Abra o Docker Desktop e espere até que ele indique que está em execução.
-4. Abra um terminal no VS Code e confira as versões.
+  Frontend                            A parte visual da loja: botões,
+                                      textos, produtos e carrinho.
 
-No Linux, você precisará do Docker Engine e do plugin Docker Compose. No macOS, pode usar o Docker Desktop.
+  Backend                             A parte que recebe pedidos do
+                                      navegador e aplica as regras.
 
-Execute:
+  Node.js                             Permite executar JavaScript no
+                                      servidor.
 
-```bash
+  Express                             Biblioteca usada pelo backend para
+                                      criar rotas e responder a
+                                      requisições.
+
+  PostgreSQL                          O banco de dados que guarda
+                                      produtos e pedidos.
+
+  Docker                              Executa programas dentro de
+                                      ambientes isolados chamados
+                                      contêineres.
+
+  Docker Compose                      Permite configurar e iniciar vários
+                                      contêineres juntos.
+
+  Git                                 Registra alterações no código.
+
+  GitHub                              Hospeda o repositório do projeto na
+                                      internet.
+
+  SSH                                 Permite abrir um terminal remoto em
+                                      outra máquina.
+
+  AWS EC2                             Serviço da AWS que fornece uma
+                                      máquina virtual na nuvem.
+
+  IP público                          Endereço usado para acessar a
+                                      máquina pela internet.
+
+  Security Group                      Firewall virtual que controla quais
+                                      conexões podem chegar à EC2.
+  -----------------------------------------------------------------------
+
+### Como as peças conversam?
+
+1.  O navegador solicita a página da loja.
+2.  O backend executado com Node.js recebe as solicitações da aplicação.
+3.  Quando precisa de produtos ou pedidos, o backend conversa com o
+    PostgreSQL.
+4.  Docker executa o backend e o banco em contêineres separados.
+5.  Docker Compose configura como esses contêineres funcionam juntos.
+6.  Na etapa de nuvem, a EC2 será a máquina que executará o projeto.
+
+### O que significa "deploy"?
+
+**Deploy** é colocar uma aplicação em um ambiente onde outras pessoas
+possam acessá-la. Primeiro vamos executar o projeto no seu computador.
+Depois vamos fazer a mesma aplicação funcionar em uma máquina virtual da
+AWS.
+
+------------------------------------------------------------------------
+
+## 2. Preparar o computador
+
+Você precisará de:
+
+-   Git;
+-   Visual Studio Code (VS Code);
+-   Docker Desktop no Windows ou macOS; no Linux, Docker Engine e Docker
+    Compose;
+-   uma conexão com a internet.
+
+### Windows: verificar as ferramentas
+
+Abra o **PowerShell**. Você pode encontrá-lo pelo menu Iniciar do
+Windows. Digite cada comando abaixo, um de cada vez.
+
+``` powershell
 git --version
+```
+
+**O que faz?** Mostra a versão do Git instalada. Git será usado para
+baixar o projeto.
+
+``` powershell
 docker --version
+```
+
+**O que faz?** Mostra a versão do Docker. Se aparecer uma mensagem
+dizendo que o comando não foi encontrado, instale o Docker Desktop.
+
+``` powershell
 docker compose version
 ```
 
-**O que deve acontecer?** Cada comando deve mostrar a versão instalada. Se algum comando não for reconhecido, confira a instalação antes de continuar.
+**O que faz?** Verifica se o comando Docker Compose está disponível. Ele
+será usado para iniciar a aplicação e o banco juntos.
 
-## 2. Baixar o projeto e abrir no VS Code
+Abra o Docker Desktop e espere até que esteja iniciado antes de executar
+comandos Docker.
 
-Abra um terminal. Escolha a pasta do computador em que deseja guardar o projeto e execute:
+> Se algum comando não funcionar, resolva a instalação dessa ferramenta
+> antes de continuar. Não adianta tentar iniciar contêineres se o Docker
+> não estiver instalado e funcionando.
 
-```bash
-git clone <URL-DO-SEU-REPOSITORIO>
+------------------------------------------------------------------------
+
+## 3. Baixar o projeto do GitHub
+
+Vamos baixar uma cópia do projeto para o seu computador.
+
+### Passo 1 --- Abrir o terminal
+
+Abra o PowerShell ou o terminal integrado do VS Code. Escolha a pasta em
+que deseja guardar o projeto. O comando a seguir criará uma pasta
+chamada `lojatech` dentro da pasta atual.
+
+``` bash
+git clone https://github.com/dpssouza/LojaTech.git lojatech
+```
+
+**Explicando o comando:**
+
+-   `git`: executa o programa Git.
+-   `clone`: significa copiar um repositório remoto para o computador.
+-   `https://github.com/dpssouza/LojaTech.git`: endereço do repositório
+    do projeto.
+-   `lojatech`: nome da pasta local que será criada. O nome em
+    minúsculas evita confusão com maiúsculas e minúsculas no Linux.
+
+### Passo 2 --- Entrar na pasta do projeto
+
+``` bash
 cd lojatech
+```
+
+**O que faz?**
+
+-   `cd` vem de *change directory*, isto é, "mudar de diretório/pasta".
+-   `lojatech` é a pasta para a qual queremos entrar.
+
+Os próximos comandos devem ser executados dentro dessa pasta, salvo
+quando o guia disser o contrário.
+
+### Passo 3 --- Abrir no VS Code
+
+``` bash
 code .
 ```
 
-Substitua `<URL-DO-SEU-REPOSITORIO>` pelo endereço real do repositório no GitHub.
+**O que significa?**
 
-**O que cada comando faz?**
+-   `code` abre o Visual Studio Code pelo terminal.
+-   `.` significa "a pasta atual".
 
-- `git clone`: baixa uma cópia do repositório.
-- `cd lojatech`: entra na pasta do projeto.
-- `code .`: abre a pasta atual no VS Code.
+Se o comando não funcionar, abra o VS Code pelo menu Iniciar, clique em
+**Arquivo → Abrir Pasta** e selecione a pasta `lojatech`.
 
-> Se o comando `code .` não funcionar, abra o VS Code manualmente e escolha **Arquivo → Abrir Pasta**. Se você ainda não publicou o projeto no GitHub, use a pasta do projeto que recebeu do professor.
+### Passo 4 --- Reconhecer os arquivos principais
 
-## 3. Configurar o arquivo de ambiente
+Na pasta do projeto, você encontrará arquivos como:
 
-O projeto usa um arquivo chamado `.env` para guardar configurações, como a senha do banco. O arquivo `.env.example` é um modelo que pode ser compartilhado; o `.env` contém os valores usados no seu ambiente.
+-   `Dockerfile`: instruções para construir a imagem da aplicação.
+-   `docker-compose.yml`: configura os serviços da aplicação e do banco.
+-   `.env.example`: modelo das variáveis de configuração.
+-   `src/`: código do backend.
+-   `public/`: arquivos da interface web.
+-   `db/`: scripts SQL e arquivos usados na inicialização do banco.
 
-### Criar o arquivo `.env`
+Não altere arquivos que ainda não conhece. Primeiro vamos executar o
+projeto como ele foi preparado.
 
-**Linux/macOS ou terminal Bash:**
+------------------------------------------------------------------------
 
-```bash
-cp .env.example .env
-```
+## 4. Configurar as senhas do banco
 
-**Windows PowerShell:**
+A aplicação precisa de senhas para conectar ao PostgreSQL. Essas
+configurações ficam no arquivo `.env`.
 
-```powershell
+### Passo 1 --- Criar o arquivo `.env`
+
+No Windows PowerShell, execute:
+
+``` powershell
 Copy-Item .env.example .env
 ```
 
-### Definir a senha do banco
+Explicação:
 
-1. Abra a pasta do projeto no VS Code.
-2. Abra o arquivo `.env`.
-3. Localize `DB_PASSWORD`.
-4. Troque o valor por uma senha forte para o laboratório.
-5. Salve o arquivo.
+-   `Copy-Item` é um comando do PowerShell para copiar um arquivo ou
+    item.
+-   `.env.example` é o arquivo-modelo que já existe no projeto.
+-   `.env` é o nome da cópia que será usada pelo Docker Compose.
 
-Use a mesma senha configurada no `.env` durante a primeira inicialização do banco. Não compartilhe essa senha.
+No Linux/macOS, o comando equivalente é:
 
-> **Segurança:** nunca envie o arquivo `.env` ao GitHub. O projeto deve ignorá-lo pelo `.gitignore`. Para conferir, execute:
->
-> ```bash
-> git check-ignore -v .env
-> ```
->
-> Se o comando mostrar uma regra, o arquivo está sendo ignorado pelo Git. O `.env.example` pode ser publicado, desde que não contenha segredos reais.
-
-## 4. Executar localmente com Docker Compose
-
-Nesta etapa, vamos iniciar a aplicação e o PostgreSQL no seu computador.
-
-### Passo 1 — Iniciar os serviços
-
-No terminal, dentro da pasta `lojatech`, execute:
-
-```bash
-docker compose up -d --build
+``` bash
+cp .env.example .env
 ```
 
-Entenda o comando:
+Aqui, `cp` significa "copy", ou seja, copiar.
 
-- `docker compose`: usa as configurações do arquivo `docker-compose.yml`.
-- `up`: cria e inicia os serviços.
-- `-d`: deixa os contêineres executando em segundo plano.
-- `--build`: constrói a imagem da aplicação antes de iniciá-la.
+### Passo 2 --- Abrir o arquivo `.env`
 
-Na primeira execução, o Docker pode precisar baixar imagens e construir a aplicação. Aguarde a conclusão.
+Abra o arquivo `.env` no VS Code. Você verá variáveis parecidas com
+estas:
 
-### Passo 2 — Conferir os contêineres
-
-```bash
-docker compose ps
+``` dotenv
+DB_NAME=lojatech
+DB_ADMIN_USER=lojatech
+DB_ADMIN_PASSWORD=SUBSTITUA_POR_UM_SEGREDO_ADMIN_FORTE
+DB_USER=lojatech_app
+DB_PASSWORD=SUBSTITUA_POR_OUTRO_SEGREDO_FORTE_E_UNICO
+DB_POOL_MAX=10
 ```
 
-Confira se os serviços aparecem em execução. Se algum serviço não estiver funcionando, consulte os logs:
+Substitua os dois valores de exemplo por senhas fortes e diferentes. Não
+use os textos de exemplo como senhas reais.
 
-```bash
-docker compose logs -f app
-```
+  -----------------------------------------------------------------------
+  Variável                            O que significa
+  ----------------------------------- -----------------------------------
+  `DB_NAME`                           Nome do banco de dados.
 
-Esse comando acompanha as mensagens da aplicação em tempo real. Para sair da visualização dos logs, pressione `Ctrl+C`. Isso **não** encerra os contêineres.
+  `DB_ADMIN_USER`                     Nome da conta administrativa usada
+                                      para inicializar o banco.
 
-### Passo 3 — Abrir a loja
+  `DB_ADMIN_PASSWORD`                 Senha dessa conta administrativa.
 
-No navegador, acesse:
+  `DB_USER`                           Nome da conta restrita que a
+                                      aplicação usa.
 
-**http://localhost:3000**
+  `DB_PASSWORD`                       Senha que a aplicação usa para
+                                      conectar ao banco.
 
-Se a página abrir, a aplicação está respondendo no seu computador.
+  `DB_POOL_MAX`                       Número máximo de conexões do
+                                      conjunto de conexões do backend.
+  -----------------------------------------------------------------------
 
-### Passo 4 — Testar a API
+**Por que existem duas senhas?** A conta administrativa serve para
+tarefas de configuração do banco. A aplicação usa uma conta separada,
+com permissões mais limitadas.
 
-Execute no terminal:
+Mantenha os nomes das variáveis exatamente como aparecem. Não remova o
+sinal `=` nem coloque espaços ao redor dele. Salve o arquivo.
 
-```bash
-curl http://localhost:3000/api/health
-```
+> **Segurança:** não envie `.env` ao GitHub. Ele contém senhas privadas.
+> O arquivo `.env.example` pode ser publicado porque deve conter apenas
+> valores fictícios.
 
-Esse endereço verifica se a aplicação responde. No PowerShell, se `curl` apresentar comportamento inesperado, use:
+------------------------------------------------------------------------
 
-```powershell
-curl.exe http://localhost:3000/api/health
-```
+## 5. Executar a aplicação no computador
 
-### Encerrar os serviços
+Agora vamos iniciar a loja e o banco com Docker Compose.
 
-Quando terminar de trabalhar, execute:
+### Passo 1 --- Confirmar a pasta
 
-```bash
-docker compose down
-```
+O terminal deve estar dentro da pasta `lojatech`, onde está o arquivo
+`docker-compose.yml`.
 
-Esse comando remove os contêineres do projeto, mas normalmente preserva o volume de dados do banco.
+Se não estiver, entre nela:
 
-> **Atenção: apagar os dados.** O comando a seguir remove também os volumes associados ao projeto e, portanto, apaga os dados locais de teste:
->
-> ```bash
-> docker compose down -v
-> ```
->
-> Use-o somente se quiser recomeçar o laboratório com o banco vazio. O script `db/init.sql` é executado quando o PostgreSQL inicializa um volume vazio. Se você alterar esse script depois da primeira inicialização, será necessário recriar o volume para que as alterações sejam aplicadas.
-
-## 5. Publicar o código no GitHub
-
-Se o projeto ainda não estiver em um repositório GitHub, siga esta etapa. Se ele já estiver publicado e você o clonou, pule para a seção 6.
-
-### Passo 1 — Criar o repositório
-
-No GitHub, crie um repositório **vazio** para o LojaTech. Para este procedimento, não inicialize o repositório com README, licença ou `.gitignore`, pois esses arquivos já podem existir no projeto local.
-
-### Passo 2 — Enviar o projeto
-
-No terminal, dentro da pasta do projeto, execute:
-
-```bash
-git init
-git add .
-git commit -m "Cria aplicação LojaTech"
-git branch -M main
-git remote add origin <URL-DO-SEU-REPOSITORIO>
-git push -u origin main
-```
-
-Troque `<URL-DO-SEU-REPOSITORIO>` pela URL do repositório que você criou.
-
-**O que esses comandos fazem?**
-
-- `git init`: prepara a pasta para usar Git.
-- `git add .`: seleciona os arquivos para o próximo registro.
-- `git commit`: registra uma versão do projeto.
-- `git branch -M main`: define o nome da branch principal como `main`.
-- `git remote add origin`: associa o projeto local ao repositório remoto.
-- `git push`: envia os commits para o GitHub.
-
-Se o Git informar que já existe um repositório remoto chamado `origin`, não repita esse comando sem antes conferir a configuração com `git remote -v`.
-
-### Passo 3 — Conferir o GitHub
-
-Abra o repositório no navegador e confirme:
-
-- [ ] Os diretórios `db/`, `src/` e `public/` estão presentes.
-- [ ] Os arquivos `Dockerfile`, `docker-compose.yml` e `README.md` estão presentes.
-- [ ] O arquivo `.env.example` está presente.
-- [ ] O arquivo `.env` **não** foi enviado.
-
-## 6. Criar a instância EC2
-
-Agora vamos preparar uma máquina virtual na AWS para executar o mesmo projeto fora do seu computador.
-
-> **Atenção aos custos:** recursos da AWS podem gerar cobranças, incluindo instâncias, discos e endereços IPv4 públicos. Confira os preços e remova os recursos quando terminar a aula.
-
-### Passo 1 — Criar a instância
-
-No console da AWS:
-
-1. Acesse o serviço **EC2**.
-2. Inicie a criação de uma instância.
-3. Escolha uma imagem **Ubuntu LTS**.
-4. Selecione um tipo de instância adequado ao laboratório e às condições da sua conta.
-5. Crie ou selecione um par de chaves para SSH.
-6. Baixe e guarde a chave privada `.pem` em local seguro. Ela permite acesso à máquina: não a compartilhe nem a envie ao GitHub.
-
-Os nomes das opções podem mudar conforme a versão do console.
-
-### Passo 2 — Configurar o Security Group
-
-O Security Group funciona como um firewall virtual da instância. Para este laboratório:
-
-| Porta | Protocolo | Finalidade | Origem recomendada |
-| --- | --- | --- | --- |
-| 22 | TCP | Conexão SSH | Seu IP atual |
-| 3000 | TCP | Acesso à aplicação durante o teste | Seu IP atual |
-
-Não libere a porta **5432** do PostgreSQL para a internet.
-
-### Passo 3 — Garantir o acesso público
-
-Para acessar a instância pela internet, confira:
-
-- a instância está no estado `running`;
-- existe um endereço IPv4 público associado à instância;
-- a subnet tem uma rota `0.0.0.0/0` apontando para um Internet Gateway;
-- o Security Group permite a porta necessária a partir do seu IP atual.
-
-Criar um Internet Gateway, sozinho, não atribui um IP público à instância. A associação de IP público e a rota da subnet também precisam estar configuradas.
-
-> Se seu IP residencial mudar, as regras do Security Group limitadas ao IP antigo deixarão de permitir a conexão. Atualize a origem para seu IP atual, em vez de liberar o acesso para qualquer endereço.
-
-## 7. Conectar à EC2 por SSH
-
-SSH é o protocolo que permite abrir um terminal remoto na máquina Ubuntu.
-
-No computador local, abra um terminal e execute o comando abaixo, substituindo o caminho da chave e o IP público pelos valores corretos:
-
-```bash
-ssh -i "caminho/para/sua-chave.pem" ubuntu@IP_PUBLICO_DA_EC2
-```
-
-Exemplo de formato: `ubuntu@203.0.113.10`. O endereço acima é apenas ilustrativo; use o IP real da sua instância.
-
-No Linux/macOS, se o SSH reclamar das permissões da chave, execute:
-
-```bash
-chmod 400 caminho/para/sua-chave.pem
-```
-
-Na primeira conexão, pode aparecer uma pergunta para confirmar a identidade do servidor. Se você estiver certo de que está conectando à sua instância, digite `yes`.
-
-**Como saber se conectou?** O terminal passará a executar comandos na máquina Ubuntu remota. Os comandos das próximas seções devem ser executados dentro dessa sessão SSH, salvo quando indicado o contrário.
-
-## 8. Instalar o Docker na EC2
-
-Os comandos desta seção são executados **dentro da EC2**, depois de conectar por SSH.
-
-### Passo 1 — Atualizar a lista de pacotes
-
-```bash
-sudo apt update
-```
-
-O comando atualiza a lista de pacotes disponíveis nos repositórios configurados.
-
-### Passo 2 — Instalar dependências básicas
-
-```bash
-sudo apt install -y ca-certificates curl git
-```
-
-Essas ferramentas serão utilizadas para acessar repositórios e baixar o código.
-
-### Passo 3 — Instalar o Docker pelo repositório oficial
-
-Siga as instruções atualizadas da documentação oficial para Ubuntu:
-
-<https://docs.docker.com/engine/install/ubuntu/>
-
-A documentação oficial é a referência para configurar o repositório, instalar o Docker Engine e instalar o plugin Docker Compose. Siga os passos correspondentes à versão do Ubuntu da sua instância.
-
-### Passo 4 — Validar a instalação
-
-```bash
-sudo docker --version
-sudo docker compose version
-sudo docker run --rm hello-world
-```
-
-O último comando baixa e executa uma imagem de teste. Se aparecer uma mensagem de sucesso do Docker, a instalação básica está funcionando.
-
-Nos próximos comandos deste README, usamos `sudo docker` para evitar configurar permissões adicionais no usuário da máquina.
-
-## 9. Executar a aplicação na EC2
-
-Agora vamos baixar o código e iniciar a aplicação na nuvem.
-
-### Passo 1 — Baixar o repositório
-
-Na sessão SSH da EC2:
-
-```bash
-git clone <URL-DO-SEU-REPOSITORIO>
+``` bash
 cd lojatech
 ```
 
-Substitua a URL pelo endereço do seu repositório GitHub.
+Se você já estiver dentro dela, não execute `cd lojatech` novamente,
+pois isso tentaria entrar em uma pasta `lojatech` dentro da pasta atual.
 
-### Passo 2 — Criar e editar o `.env`
+### Passo 2 --- Construir e iniciar a aplicação
 
-```bash
-cp .env.example .env
-nano .env
+``` bash
+docker compose up -d --build
 ```
 
-No editor `nano`, altere `DB_PASSWORD` para uma senha forte. Para salvar, pressione `Ctrl+O`, depois `Enter`. Para sair, pressione `Ctrl+X`.
+Vamos separar o comando em partes:
 
-Não reutilize uma senha pessoal e não compartilhe o arquivo `.env`.
+-   `docker`: executa o programa Docker.
+-   `compose`: chama a ferramenta que gerencia vários serviços definidos
+    no arquivo `docker-compose.yml`.
+-   `up`: cria e inicia os serviços definidos nesse arquivo.
+-   `-d`: significa *detached*. Executa os contêineres em segundo plano
+    e devolve o controle do terminal.
+-   `--build`: manda construir a imagem da aplicação antes de iniciar os
+    serviços.
 
-### Passo 3 — Construir e iniciar os contêineres
+A primeira execução pode demorar, pois o Docker pode baixar imagens da
+internet e construir a imagem da aplicação. Aguarde o comando terminar.
 
-```bash
-sudo docker compose up -d --build
+### Passo 3 --- Conferir se os serviços estão em execução
+
+``` bash
+docker compose ps
 ```
 
-Aguarde o comando terminar. Em seguida, confira o estado dos serviços:
+-   `ps` lista os contêineres/serviços do projeto e mostra o estado
+    deles.
 
-```bash
-sudo docker compose ps
+Confira se os serviços da aplicação e do banco estão ativos. Se algum
+não estiver funcionando, consulte os logs no próximo passo.
+
+### Passo 4 --- Consultar os logs
+
+Logs são mensagens que o programa registra enquanto está funcionando.
+Eles ajudam a descobrir o motivo de uma falha.
+
+Para ver as últimas 100 linhas dos logs da aplicação:
+
+``` bash
+docker compose logs --tail=100 app
 ```
 
-Se precisar investigar algum problema, consulte os logs:
+-   `logs`: mostra as mensagens registradas pelo serviço.
+-   `--tail=100`: limita a saída às últimas 100 linhas, evitando uma
+    tela enorme.
+-   `app`: nome do serviço da aplicação no Compose.
 
-```bash
-sudo docker compose logs -f app
+Para ver os logs do banco de dados:
+
+``` bash
+docker compose logs --tail=100 db
 ```
 
-Para sair dos logs, pressione `Ctrl+C`; os serviços continuam em execução.
+Aqui, `db` é o nome do serviço do PostgreSQL.
 
-### Passo 4 — Testar dentro da EC2
+Para acompanhar os logs da aplicação em tempo real:
 
-```bash
+``` bash
+docker compose logs -f app
+```
+
+-   `-f` significa *follow*: continua mostrando novas mensagens à medida
+    que aparecem.
+-   Pressione `Ctrl+C` para parar de acompanhar os logs. Isso não
+    encerra o contêiner.
+
+### Passo 5 --- Abrir a loja
+
+Abra o navegador e digite:
+
+**http://localhost:3000**
+
+O que significa `localhost`? É uma forma de dizer "este próprio
+computador". A porta `3000` é a porta publicada pelo projeto para
+acessar a aplicação.
+
+### Passo 6 --- Testar a rota de saúde
+
+No Windows PowerShell, execute:
+
+``` powershell
+curl.exe http://localhost:3000/api/health
+```
+
+No Linux/macOS:
+
+``` bash
 curl http://localhost:3000/api/health
 ```
 
-Se a aplicação responder, ela está acessível localmente dentro da instância.
+-   `curl` é uma ferramenta que faz uma requisição a um endereço web.
+-   `http://localhost:3000` é o endereço local da aplicação.
+-   `/api/health` é a rota de verificação da aplicação.
 
-### Passo 5 — Acessar pelo navegador do seu computador
+Se a resposta indicar que a verificação foi bem-sucedida, a aplicação
+conseguiu responder à requisição. Se houver erro, consulte os logs da
+aplicação e do banco.
 
-Abra:
+### Passo 7 --- Parar a aplicação
+
+Para parar e remover os contêineres do projeto:
+
+``` bash
+docker compose down
+```
+
+-   `down` para e remove os contêineres e a rede criados pelo Compose.
+-   Normalmente, o volume nomeado do banco é preservado, então os dados
+    continuam guardados.
+
+Para iniciar novamente:
+
+``` bash
+docker compose up -d
+```
+
+Desta vez, não usamos `--build`, porque não estamos pedindo uma nova
+construção da imagem.
+
+> **Cuidado:** não use `docker compose down -v` como procedimento
+> normal. A opção `-v` remove os volumes associados e pode apagar os
+> dados armazenados no PostgreSQL.
+
+------------------------------------------------------------------------
+
+## 6. Criar uma máquina virtual na AWS EC2
+
+A aplicação já funciona localmente. Agora vamos preparar uma máquina na
+nuvem para executá-la.
+
+> **Atenção a custos:** a AWS pode cobrar pelo uso da instância,
+> armazenamento e endereços IPv4 públicos. Confira os preços aplicáveis
+> à sua conta e encerre os recursos quando terminar a aula.
+
+### Passo 1 --- Abrir o serviço EC2
+
+1.  Entre no console da AWS.
+2.  Procure o serviço **EC2**.
+3.  Clique em **Launch instance** (Criar instância).
+
+A interface da AWS pode mudar um pouco com o tempo, mas os conceitos são
+os mesmos.
+
+### Passo 2 --- Configurar a instância
+
+1.  Dê um nome, por exemplo `LojaTech-Laboratorio`.
+2.  Escolha uma imagem Ubuntu LTS.
+3.  Selecione um tipo de instância adequado ao laboratório.
+4.  Crie ou selecione um par de chaves para SSH.
+5.  Baixe a chave privada `.pem` e guarde-a em local seguro.
+
+**O que é uma chave `.pem`?** É um arquivo usado para provar que você
+tem autorização para se conectar à instância. Trate-o como uma chave de
+casa: não compartilhe e não envie ao GitHub.
+
+### Passo 3 --- Configurar as regras de rede
+
+A EC2 usa um **Security Group**, que funciona como um firewall virtual.
+Ele define quais conexões podem chegar à máquina.
+
+Configure estas regras de entrada:
+
+  Tipo                  Porta Origem
+  ------------------- ------- --------------
+  SSH                      22 Seu IP atual
+  TCP personalizado      3000 Seu IP atual
+
+-   **Porta 22:** usada para conexão SSH.
+-   **Porta 3000:** usada para abrir a loja durante o laboratório.
+-   **Seu IP atual:** restringe a conexão ao seu computador/rede, quando
+    a opção `My IP` estiver disponível.
+
+Não crie uma regra de entrada para a porta `5432`. Essa porta é usada
+pelo PostgreSQL, que deve ser acessado pela aplicação na rede interna do
+Docker, não diretamente pela internet.
+
+### Passo 4 --- Conferir o IPv4 público
+
+Depois de criar a instância, procure o campo **Public IPv4 address** no
+console EC2. Anote o endereço: você vai usá-lo para conectar por SSH e
+abrir a loja.
+
+Para a conexão funcionar, a instância precisa estar em uma rede com
+acesso à internet, endereço público e regras de rede adequadas. Se a
+conexão falhar, confira essas configurações antes de alterar outras
+coisas.
+
+------------------------------------------------------------------------
+
+## 7. Conectar à EC2 por SSH
+
+SSH é uma forma de abrir um terminal em uma máquina remota. Neste caso,
+você vai controlar a Ubuntu que criou na AWS.
+
+### Windows PowerShell
+
+Imagine que a chave privada foi salva em `C:\loja.pem`. Execute:
+
+``` powershell
+ssh -i "C:\loja.pem" ubuntu@IP_PUBLICO_DA_EC2
+```
+
+Substitua `IP_PUBLICO_DA_EC2` pelo endereço IPv4 público real da sua
+instância.
+
+Explicando o comando:
+
+-   `ssh`: inicia uma conexão remota segura.
+-   `-i`: indica qual arquivo de chave privada deve ser usado.
+-   `"C:\loja.pem"`: caminho do arquivo de chave no seu computador.
+-   `ubuntu`: nome do usuário na máquina remota. Para Ubuntu na AWS,
+    esse é normalmente o usuário padrão.
+-   `@`: separa o nome do usuário do endereço da máquina.
+-   `IP_PUBLICO_DA_EC2`: endereço da instância na AWS.
+
+### Linux/macOS
+
+Primeiro, restrinja as permissões da chave:
+
+``` bash
+chmod 400 caminho/para/sua-chave.pem
+```
+
+-   `chmod`: altera as permissões de um arquivo.
+-   `400`: permite que o proprietário leia o arquivo, sem permitir
+    escrita ou acesso por outros usuários.
+
+Depois, conecte-se:
+
+``` bash
+ssh -i "caminho/para/sua-chave.pem" ubuntu@IP_PUBLICO_DA_EC2
+```
+
+Na primeira conexão, pode aparecer uma pergunta sobre confiar na
+identidade do servidor. Confirme somente se estiver certo de que o
+endereço corresponde à sua instância.
+
+**Como saber se conectou?** O terminal passa a mostrar um prompt da
+máquina Ubuntu. A partir deste ponto, os comandos de instalação devem
+ser executados nessa sessão remota, não no PowerShell local.
+
+------------------------------------------------------------------------
+
+## 8. Instalar Docker na EC2
+
+**Atenção:** os comandos desta seção devem ser executados dentro do
+terminal SSH da EC2.
+
+### Passo 1 --- Atualizar a lista de pacotes
+
+``` bash
+sudo apt update
+```
+
+-   `sudo`: executa o comando com privilégios administrativos.
+-   `apt`: ferramenta do Ubuntu para gerenciar pacotes.
+-   `update`: atualiza a lista de pacotes disponíveis. Não significa que
+    todos os programas foram atualizados.
+
+### Passo 2 --- Instalar ferramentas necessárias
+
+``` bash
+sudo apt install -y ca-certificates curl git
+```
+
+Explicando:
+
+-   `apt install`: instala programas/pacotes.
+-   `-y`: responde "sim" automaticamente às confirmações de instalação.
+-   `ca-certificates`: certificados necessários para verificar conexões
+    seguras.
+-   `curl`: ferramenta para testar endereços web e baixar conteúdo.
+-   `git`: ferramenta para baixar o repositório do projeto.
+
+### Passo 3 --- Instalar Docker Engine e Docker Compose
+
+Siga a documentação oficial do Docker para instalar o Docker Engine e o
+plugin Docker Compose na versão do Ubuntu da sua instância:
+
+<https://docs.docker.com/engine/install/ubuntu/>
+
+A documentação oficial é a referência para os comandos de instalação
+atualizados. Siga a seção correspondente à sua versão do Ubuntu.
+
+### Passo 4 --- Testar o Docker
+
+``` bash
+sudo docker --version
+```
+
+Mostra a versão do Docker instalada.
+
+``` bash
+sudo docker compose version
+```
+
+Mostra a versão do Docker Compose.
+
+``` bash
+sudo docker run --rm hello-world
+```
+
+Explicando:
+
+-   `run`: cria e executa um contêiner a partir de uma imagem.
+-   `--rm`: remove o contêiner de teste quando ele termina.
+-   `hello-world`: nome da imagem simples usada para testar a
+    instalação.
+
+Se o comando exibir uma mensagem de sucesso, o Docker está funcionando.
+
+Neste guia, usamos `sudo docker` na EC2 para evitar alterar as
+permissões do usuário.
+
+------------------------------------------------------------------------
+
+## 9. Publicar a aplicação na EC2
+
+Agora vamos colocar a loja na máquina da AWS. Execute os comandos desta
+seção dentro da sessão SSH da EC2.
+
+### Passo 1 --- Baixar o projeto
+
+``` bash
+git clone https://github.com/dpssouza/LojaTech.git lojatech
+```
+
+Esse comando baixa o repositório do GitHub e cria a pasta `lojatech`.
+
+``` bash
+cd lojatech
+```
+
+Entra na pasta que acabou de ser criada.
+
+### Passo 2 --- Criar o arquivo `.env`
+
+``` bash
+cp .env.example .env
+```
+
+-   `cp`: copia um arquivo.
+-   `.env.example`: arquivo-modelo.
+-   `.env`: arquivo que conterá as configurações usadas neste ambiente.
+
+### Passo 3 --- Editar as senhas
+
+``` bash
+nano .env
+```
+
+-   `nano`: editor de texto que funciona dentro do terminal.
+
+Substitua as duas senhas fictícias (`DB_ADMIN_PASSWORD` e `DB_PASSWORD`)
+por senhas fortes e diferentes.
+
+Para salvar no `nano`:
+
+1.  Pressione `Ctrl+O` para gravar o arquivo.
+2.  Pressione `Enter` para confirmar o nome.
+3.  Pressione `Ctrl+X` para sair.
+
+### Passo 4 --- Construir e iniciar a aplicação
+
+``` bash
+sudo docker compose up -d --build
+```
+
+É o mesmo comando usado localmente, mas com `sudo` porque estamos
+executando Docker na EC2.
+
+-   `sudo`: executa o comando com privilégios administrativos.
+-   `docker compose`: usa a configuração do `docker-compose.yml`.
+-   `up`: cria e inicia os serviços.
+-   `-d`: deixa os serviços rodando em segundo plano.
+-   `--build`: constrói a imagem da aplicação antes de iniciá-la.
+
+Aguarde a conclusão.
+
+### Passo 5 --- Conferir os serviços
+
+``` bash
+sudo docker compose ps
+```
+
+Lista os serviços e seus estados.
+
+Se algum serviço não estiver funcionando, consulte os logs:
+
+``` bash
+sudo docker compose logs --tail=100 app
+```
+
+``` bash
+sudo docker compose logs --tail=100 db
+```
+
+### Passo 6 --- Testar a aplicação dentro da EC2
+
+``` bash
+curl http://localhost:3000/api/health
+```
+
+Esse teste é executado na própria máquina EC2. `localhost` significa
+"esta máquina", neste caso, a instância Ubuntu.
+
+### Passo 7 --- Abrir a loja no seu computador
+
+No navegador do seu computador, acesse:
 
 `http://IP_PUBLICO_DA_EC2:3000`
 
 Substitua `IP_PUBLICO_DA_EC2` pelo IPv4 público real da instância.
 
-Se não abrir, não exponha o banco de dados. Consulte a seção [11. Resolver problemas comuns](#11-resolver-problemas-comuns) e verifique principalmente o IP público, a rota da subnet, o Security Group e o estado dos contêineres.
+Se a página abrir, parabéns: sua aplicação está acessível pela internet
+para o teste do laboratório.
 
-## 10. Atualizar a aplicação na EC2
+> O acesso por HTTP e pela porta 3000 é apenas para fins didáticos. Não
+> utilize esse procedimento como configuração de produção.
 
-Quando você alterar o código e enviar as mudanças ao GitHub, será necessário atualizar a cópia que está na EC2.
+------------------------------------------------------------------------
 
-Conecte-se por SSH e execute:
+## 10. Atualizar a aplicação
 
-```bash
+Se você fizer alterações no projeto, enviá-las ao GitHub e quiser
+baixá-las para a EC2, conecte-se por SSH e execute:
+
+``` bash
 cd lojatech
+```
+
+Entra na pasta do projeto na EC2.
+
+``` bash
 git pull
+```
+
+-   `git`: ferramenta de controle de versão.
+-   `pull`: busca e integra as alterações publicadas no repositório
+    remoto.
+
+Depois, reconstrua e inicie os serviços:
+
+``` bash
 sudo docker compose up -d --build
+```
+
+Por fim, confira:
+
+``` bash
 sudo docker compose ps
 ```
 
-**Por que reconstruir?** O comando `git pull` baixa as mudanças do repositório. O comando `docker compose up -d --build` reconstrói a imagem da aplicação quando necessário e recria/inicia os serviços conforme a configuração do Compose.
+**Importante:** não apague volumes para atualizar o código. Os volumes
+podem guardar os produtos, pedidos e alterações de estoque do
+laboratório.
+
+------------------------------------------------------------------------
 
 ## 11. Resolver problemas comuns
 
-Antes de mudar configurações, identifique em qual etapa o problema acontece. Estes comandos ajudam a investigar.
+### A página não abre no computador
 
-### Comandos de diagnóstico
+1.  Confirme que o Docker Desktop está iniciado.
+2.  Execute `docker compose ps` na pasta do projeto.
+3.  Consulte os logs:
 
-Execute na pasta do projeto. Na EC2, acrescente `sudo` antes de `docker`:
-
-```bash
-docker compose ps
+``` bash
 docker compose logs --tail=100 app
 docker compose logs --tail=100 db
-docker image ls
-docker container ls -a
 ```
 
-Para verificar portas em escuta no Linux/EC2:
+4.  Confirme que o endereço local é `http://localhost:3000`.
 
-```bash
-sudo ss -lntp
+### A aplicação não conecta ao banco
+
+1.  Confira se o serviço `db` está em execução:
+
+``` bash
+docker compose ps
 ```
 
-### Problemas frequentes
+2.  Confira se o arquivo `.env` contém `DB_ADMIN_PASSWORD` e
+    `DB_PASSWORD`.
+3.  Consulte os logs da aplicação e do banco.
+4.  Não apague o volume do banco como primeira tentativa.
 
-| Sintoma | O que verificar |
-| --- | --- |
-| `docker: command not found` | O Docker está instalado? No Windows/macOS, o Docker Desktop está aberto e totalmente iniciado? |
-| Erro ao conectar ao Docker daemon | O serviço do Docker está ativo? No Windows/macOS, aguarde a inicialização do Docker Desktop. |
-| Porta 3000 já está em uso | Outro programa pode estar usando a porta. Confira os contêineres e os processos antes de parar qualquer serviço. |
-| A página não abre na EC2 | Confira o IP público, o estado da instância, a rota da subnet, a regra TCP 3000 do Security Group e se os contêineres estão em execução. |
-| SSH expira (`timeout`) | Confira o IP público, a rota da subnet e se a porta TCP 22 permite seu IP atual. |
-| `Permission denied (publickey)` | Confira o caminho da chave `.pem`, o usuário `ubuntu` e as permissões da chave. |
-| Alterei `db/init.sql`, mas nada mudou | O script de inicialização só é executado quando o banco inicializa um volume vazio. Recriar o volume apaga os dados de teste. |
-| A aplicação não conecta ao banco | Consulte os logs do banco e confira se `DB_PASSWORD` corresponde à configuração usada na inicialização do banco. |
+### Não consigo conectar à EC2
 
-Se precisar recriar o banco local do zero, lembre-se de que o comando abaixo apaga os dados armazenados no volume:
+1.  Confirme que a instância está no estado `running`.
+2.  Confira se está usando o IPv4 público correto.
+3.  Confira se a regra SSH (porta 22) permite o seu IP.
+4.  Confira se a chave `.pem` corresponde ao par de chaves da instância
+    e se o usuário SSH é `ubuntu`.
 
-```bash
-docker compose down -v
+### Conectei à EC2, mas a página não abre
+
+1.  Dentro da EC2, confira os contêineres:
+
+``` bash
+sudo docker compose ps
 ```
 
-> **Não tente resolver falhas abrindo a porta 5432 para a internet.** Mantenha o PostgreSQL sem exposição pública.
+2.  Teste a aplicação na própria EC2:
 
-## 12. Limpar os recursos ao terminar
+``` bash
+curl http://localhost:3000/api/health
+```
 
-Esta etapa é importante para evitar custos desnecessários na AWS.
+3.  Confira se a regra TCP 3000 do Security Group permite seu IP.
+4.  Confira o IPv4 público e os logs da aplicação.
 
-### Passo 1 — Remover os contêineres do projeto
+### O que significa `command not found`?
 
-Dentro da EC2, entre na pasta do projeto e execute:
+Significa que o terminal não encontrou o programa indicado. Confira se o
+programa está instalado e se você digitou o comando corretamente.
 
-```bash
-cd lojatech
+### O que significa `Permission denied`?
+
+Significa que o usuário atual não tem permissão para realizar a ação ou
+que o acesso SSH não foi autorizado. Leia a mensagem completa e confira
+em qual máquina você está executando o comando.
+
+> Nunca tente resolver problemas expondo a porta 5432 do PostgreSQL à
+> internet.
+
+------------------------------------------------------------------------
+
+## 12. Encerrar o laboratório e evitar custos
+
+### Passo 1 --- Parar os contêineres
+
+Dentro da EC2, na pasta `lojatech`, execute:
+
+``` bash
 sudo docker compose down
 ```
 
-Isso remove os contêineres do projeto, mas não encerra a instância EC2 nem elimina todos os recursos da AWS.
+-   `down`: para e remove os contêineres e a rede criados pelo Compose.
+-   Esse comando não encerra a instância EC2.
 
-### Passo 2 — Encerrar a instância
+### Passo 2 --- Encerrar a instância
 
-No console da AWS, **encerre (terminate)** a instância quando não precisar mais dela. Apenas parar a instância não elimina todas as cobranças possíveis, pois recursos como discos podem continuar existindo.
+Quando terminar a atividade:
 
-### Passo 3 — Conferir recursos restantes
+1.  Abra o console AWS.
+2.  Entre no serviço EC2.
+3.  Selecione a instância criada para o laboratório.
+4.  Escolha **Terminate instance** (Encerrar instância) se não precisar
+    mais dela.
 
-No console AWS, confira se ficaram recursos que você criou durante o laboratório:
+Apenas parar uma instância não elimina necessariamente todos os custos.
 
-- [ ] Volumes EBS que não são mais necessários.
-- [ ] Snapshots.
-- [ ] Elastic IPs alocados.
-- [ ] Outras instâncias ou recursos criados durante a aula.
+### Passo 3 --- Conferir recursos restantes
 
-Apagar os contêineres não exclui automaticamente os recursos da sua conta AWS. Antes de remover qualquer recurso, confira se ele realmente pertence ao laboratório e não está sendo usado por outra atividade.
+Confira se sobraram recursos criados para a aula que não são mais
+necessários, como volumes EBS, snapshots ou endereços Elastic IP.
+Verifique antes de excluir para não apagar algo que deseja manter.
 
----
+------------------------------------------------------------------------
 
-## Estrutura dos arquivos
+## 13. Entender os arquivos do projeto
 
-```text
-lojatech/
+``` text
+LojaTech/
 ├── db/
-│   └── init.sql             # Script inicial do banco de dados
+│   ├── init.sql
+│   ├── create-app-user.sh
+│   └── create-app-user.sql
 ├── public/
-│   ├── app.js               # JavaScript da interface
-│   ├── index.html           # Página principal
-│   └── styles.css           # Estilos da loja
+│   ├── index.html
+│   ├── styles.css
+│   └── app.js
 ├── src/
-│   └── server.js            # Servidor Node.js/Express
-├── .env.example             # Modelo das variáveis de ambiente
-├── .gitignore               # Arquivos que o Git deve ignorar
-├── Dockerfile               # Instruções para construir a imagem
-├── docker-compose.yml       # Configuração dos serviços
-├── package.json             # Dependências e scripts Node.js
-└── README.md                # Este guia
+│   └── server.js
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+└── README.md
 ```
 
-## Desafios para continuar aprendendo
+  -----------------------------------------------------------------------
+  Arquivo/pasta                       Para que serve?
+  ----------------------------------- -----------------------------------
+  `db/`                               Contém scripts relacionados ao
+                                      banco de dados.
 
-Depois que o laboratório estiver funcionando, você pode avançar aos poucos:
+  `db/init.sql`                       Cria a estrutura inicial e os dados
+                                      de exemplo do banco.
 
-1. Criar um endpoint para consultar um pedido pelo ID.
-2. Criar um painel administrativo protegido para cadastrar produtos.
-3. Adicionar testes automatizados.
-4. Distribuir a imagem usando Docker Hub ou Amazon ECR.
-5. Configurar HTTPS com domínio e proxy reverso.
-6. Automatizar o deploy com GitHub Actions — depois de entender o processo manual.
+  `public/`                           Contém os arquivos da interface
+                                      web.
 
-## Checklist final do laboratório
+  `src/server.js`                     Código do servidor Node.js e das
+                                      rotas da API.
 
-Antes de encerrar, confira o que você conseguiu fazer:
+  `.env.example`                      Modelo das variáveis de
+                                      configuração.
 
-- [ ] Baixei o projeto e abri no VS Code.
-- [ ] Criei o arquivo `.env` sem publicá-lo no GitHub.
-- [ ] Iniciei a aplicação e o PostgreSQL com Docker Compose.
-- [ ] Acessei `http://localhost:3000`.
-- [ ] Testei o endpoint `/api/health`.
-- [ ] Publiquei o código no GitHub (quando aplicável).
-- [ ] Conectei à EC2 por SSH.
-- [ ] Instalei e testei o Docker na EC2.
-- [ ] Acessei a aplicação pela EC2.
-- [ ] Conferi e limpei os recursos da AWS ao terminar.
+  `.gitignore`                        Informa ao Git quais arquivos não
+                                      devem ser incluídos no repositório.
+
+  `Dockerfile`                        Explica como construir a imagem da
+                                      aplicação.
+
+  `docker-compose.yml`                Define como executar os serviços e
+                                      conectá-los.
+
+  `package.json`                      Lista informações, dependências e
+                                      comandos do projeto.
+
+  `README.md`                         Este guia.
+  -----------------------------------------------------------------------
+
+O arquivo `.env` é criado durante a configuração e não deve ser enviado
+ao GitHub.
+
+## Referências oficiais
+
+-   Docker Engine no Ubuntu:
+    <https://docs.docker.com/engine/install/ubuntu/>
+-   Docker Compose: <https://docs.docker.com/compose/>
+-   AWS EC2: <https://docs.aws.amazon.com/ec2/>
+-   GitHub Docs: <https://docs.github.com/>
+
+------------------------------------------------------------------------
+
+**Parabéns por concluir o laboratório!** Você baixou um projeto,
+executou uma aplicação com Docker, conectou serviços e publicou uma loja
+virtual didática em uma máquina virtual na nuvem. Continue praticando e
+lembre-se de usar dados fictícios durante as atividades.
