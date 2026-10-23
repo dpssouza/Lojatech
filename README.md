@@ -508,6 +508,39 @@ Explicando o comando:
 -   `@`: separa o nome do usuário do endereço da máquina.
 -   `IP_PUBLICO_DA_EC2`: endereço da instância na AWS.
 
+### Se o SSH apresentar erro de permissões no arquivo `.pem` (Windows)
+
+Se aparecer uma mensagem como `UNPROTECTED PRIVATE KEY FILE`, `Bad permissions` ou `Permissions for ... are too open`, o Windows pode estar permitindo que outros usuários acessem a chave privada.
+
+Neste caso, se a chave estiver em `C:\loja.pem`, abra o PowerShell no Windows e execute os comandos abaixo, um de cada vez:
+
+```powershell
+icacls "C:\loja.pem" /reset
+icacls "C:\loja.pem" /grant:r "$($env:USERNAME):(R)"
+icacls "C:\loja.pem" /inheritance:r
+```
+
+**O que esses comandos fazem?**
+
+- `icacls`: ferramenta do Windows para consultar e alterar permissões de arquivos.
+- `/reset`: restaura as permissões herdadas ou padrão aplicáveis ao arquivo.
+- `/grant:r`: concede a permissão especificada, substituindo concessões explícitas anteriores para o usuário indicado.
+- `$($env:USERNAME):(R)`: concede permissão de leitura ao usuário atual do Windows.
+- `/inheritance:r`: desativa a herança de permissões e remove as permissões herdadas.
+
+Depois, tente novamente a conexão SSH:
+
+```powershell
+ssh -i "C:\loja.pem" ubuntu@IP_PUBLICO_DA_EC2
+```
+
+Substitua `IP_PUBLICO_DA_EC2` pelo IPv4 público da sua instância.
+
+**Importante:** execute esses comandos apenas no arquivo correto da chave privada. Nunca envie o arquivo `.pem` ao GitHub ou compartilhe seu conteúdo.
+
+Se o erro continuar, confira o caminho da chave, as permissões do arquivo, o usuário SSH e se a chave corresponde à instância EC2.
+
+
 ### Linux/macOS
 
 Primeiro, restrinja as permissões da chave:
