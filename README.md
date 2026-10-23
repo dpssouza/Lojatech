@@ -44,52 +44,22 @@ dados.
 
 ### As peças do projeto
 
-  -----------------------------------------------------------------------
-  Peça                                Explicação simples
-  ----------------------------------- -----------------------------------
-  Navegador                           O programa usado para abrir sites,
-                                      como Chrome.
-
-  Frontend                            A parte visual da loja: botões,
-                                      textos, produtos e carrinho.
-
-  Backend                             A parte que recebe pedidos do
-                                      navegador e aplica as regras.
-
-  Node.js                             Permite executar JavaScript no
-                                      servidor.
-
-  Express                             Biblioteca usada pelo backend para
-                                      criar rotas e responder a
-                                      requisições.
-
-  PostgreSQL                          O banco de dados que guarda
-                                      produtos e pedidos.
-
-  Docker                              Executa programas dentro de
-                                      ambientes isolados chamados
-                                      contêineres.
-
-  Docker Compose                      Permite configurar e iniciar vários
-                                      contêineres juntos.
-
-  Git                                 Registra alterações no código.
-
-  GitHub                              Hospeda o repositório do projeto na
-                                      internet.
-
-  SSH                                 Permite abrir um terminal remoto em
-                                      outra máquina.
-
-  AWS EC2                             Serviço da AWS que fornece uma
-                                      máquina virtual na nuvem.
-
-  IP público                          Endereço usado para acessar a
-                                      máquina pela internet.
-
-  Security Group                      Firewall virtual que controla quais
-                                      conexões podem chegar à EC2.
-  -----------------------------------------------------------------------
+| Peça | Explicação simples |
+|---|---|
+| Navegador | O programa usado para abrir sites, como Chrome. |
+| Frontend | A parte visual da loja: botões, textos, produtos e carrinho. |
+| Backend | A parte que recebe pedidos do navegador e aplica as regras. |
+| Node.js | Permite executar JavaScript no servidor. |
+| Express | Biblioteca usada pelo backend para criar rotas e responder a requisições. |
+| PostgreSQL | O banco de dados que guarda produtos e pedidos. |
+| Docker | Executa programas dentro de ambientes isolados chamados contêineres. |
+| Docker Compose | Permite configurar e iniciar vários contêineres juntos. |
+| Git | Registra alterações no código. |
+| GitHub | Hospeda o repositório do projeto na internet. |
+| SSH | Permite abrir um terminal remoto em outra máquina. |
+| AWS EC2 | Serviço da AWS que fornece uma máquina virtual na nuvem. |
+| IP público | Endereço usado para acessar a máquina pela internet. |
+| Security Group | Firewall virtual que controla quais conexões podem chegar à EC2. |
 
 ### Como as peças conversam?
 
