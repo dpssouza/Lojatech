@@ -1,10 +1,25 @@
+
+# Segredos e configurações locais
 .env
 .env.*
 !.env.example
+
+# Dependências e logs
 node_modules/
 npm-debug.log*
-.DS_Store
+yarn-debug.log*
+pnpm-debug.log*
+
+# Testes e cobertura
 coverage/
 .nyc_output/
 
+# Arquivos do sistema e editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Backups e dumps de banco de dados
 *.dump
+*.sql.bak
+*.backup
