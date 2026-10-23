@@ -255,6 +255,12 @@ use os textos de exemplo como senhas reais.
 
   `DB_POOL_MAX`                       Número máximo de conexões do
                                       conjunto de conexões do backend.
+
+  `APP_BIND_IP`                       Endereço local em que a porta será
+                                      publicada. Use `127.0.0.1` no computador.
+
+  `APP_HOST_PORT`                     Porta do computador usada para acessar
+                                      a aplicação (por padrão, `3000`).
   -----------------------------------------------------------------------
 
 **Por que existem duas senhas?** A conta administrativa serve para
@@ -449,17 +455,15 @@ casa: não compartilhe e não envie ao GitHub.
 A EC2 usa um **Security Group**, que funciona como um firewall virtual.
 Ele define quais conexões podem chegar à máquina.
 
-Configure estas regras de entrada:
+Configure estas regras de entrada para o laboratório:
 
-  Tipo                  Porta Origem
-  ------------------- ------- --------------
-  SSH                      22 Seu IP atual
-  TCP personalizado      3000 Seu IP atual
+| Tipo | Porta | Origem |
+|---|---:|---|
+| SSH | 22 | Seu IP atual (`My IP`) |
+| TCP personalizado | 3000 | Seu IP atual (`My IP`) |
 
--   **Porta 22:** usada para conexão SSH.
--   **Porta 3000:** usada para abrir a loja durante o laboratório.
--   **Seu IP atual:** restringe a conexão ao seu computador/rede, quando
-    a opção `My IP` estiver disponível.
+- **Porta 22:** usada para conexão SSH. Restrinja-a ao seu IP sempre que possível.
+- **Porta 3000:** usada para abrir a loja durante o laboratório. Restrinja-a ao seu IP; não use `Anywhere` (`0.0.0.0/0`) sem necessidade.
 
 Não crie uma regra de entrada para a porta `5432`. Essa porta é usada
 pelo PostgreSQL, que deve ser acessado pela aplicação na rede interna do
@@ -613,16 +617,12 @@ seção dentro da sessão SSH da EC2.
 ### Passo 1 --- Baixar o projeto
 
 ``` bash
-git clone https://github.com/dpssouza/LojaTech.git lojatech
-```
-
-Esse comando baixa o repositório do GitHub e cria a pasta `lojatech`.
-
-``` bash
+git clone https://github.com/dpssouza/Lojatech.git lojatech
 cd lojatech
 ```
 
-Entra na pasta que acabou de ser criada.
+O primeiro comando baixa o repositório do GitHub e cria a pasta `lojatech`.
+O segundo entra nessa pasta.
 
 ### Passo 2 --- Criar o arquivo `.env`
 
@@ -630,26 +630,38 @@ Entra na pasta que acabou de ser criada.
 cp .env.example .env
 ```
 
--   `cp`: copia um arquivo.
--   `.env.example`: arquivo-modelo.
--   `.env`: arquivo que conterá as configurações usadas neste ambiente.
+- `cp`: copia um arquivo.
+- `.env.example`: arquivo-modelo versionado no GitHub.
+- `.env`: arquivo local com as configurações privadas deste ambiente.
 
-### Passo 3 --- Editar as senhas
+### Passo 3 --- Configurar as senhas e a porta de acesso
 
 ``` bash
 nano .env
 ```
 
--   `nano`: editor de texto que funciona dentro do terminal.
+Substitua `DB_ADMIN_PASSWORD` e `DB_PASSWORD` por senhas fortes e
+**diferentes entre si**. Não reutilize senhas pessoais nem publique o
+arquivo `.env`.
 
-Substitua as duas senhas fictícias (`DB_ADMIN_PASSWORD` e `DB_PASSWORD`)
-por senhas fortes e diferentes.
+Na EC2, confira também estas duas linhas:
+
+```dotenv
+APP_BIND_IP=0.0.0.0
+APP_HOST_PORT=3000
+```
+
+`APP_BIND_IP=0.0.0.0` faz o Docker publicar a porta em todas as interfaces
+de rede da instância, permitindo o acesso externo quando o Security Group
+também autorizar. Isso é necessário na configuração didática atual, pois
+o valor padrão `127.0.0.1` permite acesso somente a partir da própria EC2.
+A porta `3000` deve continuar restrita ao seu IP no Security Group.
 
 Para salvar no `nano`:
 
-1.  Pressione `Ctrl+O` para gravar o arquivo.
-2.  Pressione `Enter` para confirmar o nome.
-3.  Pressione `Ctrl+X` para sair.
+1. Pressione `Ctrl+O` para gravar o arquivo.
+2. Pressione `Enter` para confirmar o nome.
+3. Pressione `Ctrl+X` para sair.
 
 ### Passo 4 --- Construir e iniciar a aplicação
 
@@ -657,14 +669,11 @@ Para salvar no `nano`:
 sudo docker compose up -d --build
 ```
 
-É o mesmo comando usado localmente, mas com `sudo` porque estamos
-executando Docker na EC2.
-
--   `sudo`: executa o comando com privilégios administrativos.
--   `docker compose`: usa a configuração do `docker-compose.yml`.
--   `up`: cria e inicia os serviços.
--   `-d`: deixa os serviços rodando em segundo plano.
--   `--build`: constrói a imagem da aplicação antes de iniciá-la.
+- `sudo`: executa o comando com privilégios administrativos.
+- `docker compose`: usa a configuração do `docker-compose.yml`.
+- `up`: cria e inicia os serviços.
+- `-d`: deixa os serviços rodando em segundo plano.
+- `--build`: constrói a imagem da aplicação antes de iniciá-la.
 
 Aguarde a conclusão.
 
@@ -674,26 +683,23 @@ Aguarde a conclusão.
 sudo docker compose ps
 ```
 
-Lista os serviços e seus estados.
-
+Confira se `app` está em execução e se `db` está saudável (`healthy`).
 Se algum serviço não estiver funcionando, consulte os logs:
 
 ``` bash
 sudo docker compose logs --tail=100 app
-```
-
-``` bash
 sudo docker compose logs --tail=100 db
 ```
 
 ### Passo 6 --- Testar a aplicação dentro da EC2
 
 ``` bash
-curl http://localhost:3000/api/health
+curl http://127.0.0.1:3000/api/health
 ```
 
-Esse teste é executado na própria máquina EC2. `localhost` significa
-"esta máquina", neste caso, a instância Ubuntu.
+Esse teste é executado na própria máquina EC2. `127.0.0.1` significa a
+própria instância. A resposta esperada é um JSON indicando que o serviço
+está saudável, por exemplo `{"status":"ok"}`.
 
 ### Passo 7 --- Abrir a loja no seu computador
 
@@ -702,12 +708,22 @@ No navegador do seu computador, acesse:
 `http://IP_PUBLICO_DA_EC2:3000`
 
 Substitua `IP_PUBLICO_DA_EC2` pelo IPv4 público real da instância.
+A conexão só funcionará se:
 
-Se a página abrir, parabéns: sua aplicação está acessível pela internet
-para o teste do laboratório.
+1. `APP_BIND_IP=0.0.0.0` estiver configurado no `.env` da EC2;
+2. o Security Group permitir TCP 3000 a partir do seu IP;
+3. a instância tiver conectividade de rede e um IPv4 público válido.
 
-> O acesso por HTTP e pela porta 3000 é apenas para fins didáticos. Não
-> utilize esse procedimento como configuração de produção.
+Se alterar o `.env` depois de iniciar os contêineres, recrie os serviços:
+
+``` bash
+sudo docker compose up -d --force-recreate
+```
+
+> **Limite de segurança:** este é um acesso HTTP sem criptografia, destinado
+> somente ao laboratório e a dados fictícios. Não use essa configuração em
+> produção. Para um serviço público real, configure HTTPS com um proxy
+> reverso e reveja as regras de rede. Nunca publique a porta `5432` do banco.
 
 ------------------------------------------------------------------------
 
@@ -798,8 +814,9 @@ sudo docker compose ps
 curl http://localhost:3000/api/health
 ```
 
-3.  Confira se a regra TCP 3000 do Security Group permite seu IP.
-4.  Confira o IPv4 público e os logs da aplicação.
+3.  Confira se o `.env` da EC2 contém `APP_BIND_IP=0.0.0.0` e `APP_HOST_PORT=3000`.
+4.  Confira se a regra TCP 3000 do Security Group permite seu IP.
+5.  Confira o IPv4 público e os logs da aplicação.
 
 ### O que significa `command not found`?
 
@@ -838,7 +855,8 @@ Quando terminar a atividade:
 2.  Entre no serviço EC2.
 3.  Selecione a instância criada para o laboratório.
 4.  Escolha **Terminate instance** (Encerrar instância) se não precisar
-    mais dela.
+    mais dela. Essa ação é irreversível para a instância e pode causar perda
+    de dados que não tenham sido salvos em outro lugar.
 
 Apenas parar uma instância não elimina necessariamente todos os custos.
 
