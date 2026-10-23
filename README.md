@@ -862,6 +862,89 @@ Significa que o usuário atual não tem permissão para realizar a ação ou
 que o acesso SSH não foi autorizado. Leia a mensagem completa e confira
 em qual máquina você está executando o comando.
 
+#### Erro `ERR_CONNECTION_REFUSED` ao acessar a loja
+
+Se o navegador apresentar `ERR_CONNECTION_REFUSED` ao acessar `http://IP_PUBLICO_DA_EC2:3000`, siga esta sequência de diagnóstico.
+
+**1. Verifique se os contêineres estão em execução**
+
+Dentro do terminal SSH da EC2, na pasta `lojatech`, execute:
+
+```bash
+sudo docker compose ps
+```
+
+Se algum serviço não estiver funcionando, consulte os logs:
+
+```bash
+sudo docker compose logs --tail=100 app
+sudo docker compose logs --tail=100 db
+```
+
+**2. Confira o endereço de publicação da aplicação**
+
+Abra o arquivo `.env` da EC2:
+
+```bash
+nano .env
+```
+
+Confira se contém:
+
+```dotenv
+APP_BIND_IP=0.0.0.0
+APP_HOST_PORT=3000
+```
+
+O endereço `0.0.0.0` permite que a porta publicada pelo Docker escute nas interfaces de rede da instância. Isso não libera, por si só, o acesso pela internet: as regras de rede também precisam permitir a conexão.
+
+Salve o arquivo e saia do editor. Se alterou alguma variável, recrie os serviços:
+
+```bash
+sudo docker compose up -d --force-recreate
+```
+
+**3. Teste a aplicação dentro da EC2**
+
+```bash
+curl http://127.0.0.1:3000/api/health
+```
+
+Se o teste falhar, investigue o estado dos contêineres e os logs antes de avançar.
+
+**4. Confira a porta publicada pelo Docker**
+
+```bash
+sudo docker compose ps
+```
+
+A publicação esperada para este laboratório é semelhante a:
+
+```text
+0.0.0.0:3000->3000/tcp
+```
+
+**5. Confira o Security Group na AWS**
+
+No console da AWS, abra a instância EC2, acesse a seção **Security**, clique no Security Group associado e confira as regras de entrada.
+
+Deve existir uma regra permitindo **TCP 3000** com origem no seu IP atual (`My IP`). Não é necessário abrir a porta para todos os endereços da internet.
+
+**6. Tente acessar novamente**
+
+No navegador do seu computador, acesse:
+
+```text
+http://IP_PUBLICO_DA_EC2:3000
+```
+
+Substitua `IP_PUBLICO_DA_EC2` pelo IPv4 público atual da instância.
+
+Se continuar sem funcionar, confira também o IPv4 público, a conectividade de rede da instância e os logs. Não exponha a porta `5432` do PostgreSQL como solução para esse problema.
+
+> **Segurança:** este procedimento é destinado ao laboratório educacional, com dados fictícios e acesso HTTP. Para produção, utilize HTTPS e uma configuração de rede apropriada.
+
+
 > Nunca tente resolver problemas expondo a porta 5432 do PostgreSQL à
 > internet.
 
