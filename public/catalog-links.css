@@ -1,0 +1,4 @@
+.product-detail-link { color: inherit; text-decoration: none; }
+.product-name-link:hover { color: #4b55d9; }
+.product-image-link { display: block; overflow: hidden; }
+.product-image-link .product-image { display: block; }

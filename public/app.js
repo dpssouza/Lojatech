@@ -25,7 +25,7 @@ async function loadProducts() {
 function renderProducts() {
   grid.innerHTML = products.map(product => `
     <article class="product-card">
-      <img class="product-image" src="${escapeHtml(product.image_url || '')}" alt="${escapeHtml(product.name)}" loading="lazy">
+      <a href="/produto.html?id=${encodeURIComponent(product.id)}" aria-label="Ver detalhes de ${escapeHtml(product.name)}"><img class="product-image" src="${escapeHtml(product.image_url || '')}" alt="${escapeHtml(product.name)}" loading="lazy"></a>
       <div class="product-info"><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.description)}</p>
       <div class="product-bottom"><span class="price">${money(product.price)}</span><button class="add-button" data-add="${product.id}" ${Number(product.stock) < 1 ? 'disabled' : ''}>Adicionar +</button></div>
       <div class="stock">${product.stock} em estoque</div></div>

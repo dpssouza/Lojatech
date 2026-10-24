@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT NOT NULL,
   price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
   image_url TEXT,
+  image_urls JSONB NOT NULL DEFAULT '[]'::jsonb,
   stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
   active BOOLEAN NOT NULL DEFAULT TRUE
 );

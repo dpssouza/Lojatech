@@ -1,0 +1,200 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>Administração | LojaTech</title>
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>LojaTech — Painel administrativo</h1>
+  </header>
+
+  <main>
+    <section id="loginSection" class="card login">
+      <h2>Entrar</h2>
+      <p class="hint">Acesse com as credenciais administrativas.</p>
+
+      <form id="loginForm">
+        <label for="username">Usuário</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          required
+        >
+
+        <label for="password">Senha</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit">Entrar</button>
+      </form>
+
+      <p id="loginMessage" class="message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="adminSection" class="hidden">
+      <div class="welcome-row">
+        <div>
+          <span class="eyebrow">VISÃO GERAL</span>
+          <h1>Gestão de produtos</h1>
+          <p class="hint">Gerencie seu catálogo, preços e disponibilidade em um só lugar.</p>
+        </div>
+        <div class="welcome-mark" aria-hidden="true">L</div>
+      </div>
+      <div class="card intro-card">
+        <div class="actions">
+          <div>
+            <span class="eyebrow">SEU CATÁLOGO</span>
+            <h2>Produtos</h2>
+          </div>
+          <button
+            id="logoutButton"
+            class="secondary"
+            type="button"
+          >
+            Sair
+          </button>
+        </div>
+
+        <p class="hint">
+          Cadastre produtos, edite informações e gerencie estoque e disponibilidade.
+        </p>
+      </div>
+
+      <section class="stats-grid" id="dashboardStats" aria-label="Resumo do estoque">
+        <article class="stat-card">
+          <span class="stat-label">Total de produtos</span>
+          <strong class="stat-value" id="totalProducts">—</strong>
+          <span class="stat-note">Cadastrados no sistema</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Produtos ativos</span>
+          <strong class="stat-value" id="activeProducts">—</strong>
+          <span class="stat-note">Disponíveis no catálogo</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Estoque baixo</span>
+          <strong class="stat-value" id="lowStockProducts">—</strong>
+          <span class="stat-note">5 unidades ou menos</span>
+        </article>
+      </section>
+
+      <div class="card">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">CATÁLOGO</span>
+            <h2 id="formTitle">Cadastrar produto</h2>
+          </div>
+          <span class="section-icon" aria-hidden="true">＋</span>
+        </div>
+
+        <form id="productForm">
+          <input id="productId" name="productId" type="hidden">
+
+          <label for="productName">Nome do produto</label>
+          <input
+            id="productName"
+            name="productName"
+            type="text"
+            maxlength="120"
+            required
+          >
+
+          <label for="productDescription">Descrição</label>
+          <textarea
+            id="productDescription"
+            name="productDescription"
+            required
+          ></textarea>
+
+          <label for="productPrice">Preço (R$)</label>
+          <input
+            id="productPrice"
+            name="productPrice"
+            type="number"
+            min="0"
+            max="99999999.99"
+            step="0.01"
+            required
+          >
+
+          <label for="productImage">URL da imagem</label>
+          <input
+            id="productImage"
+            name="productImage"
+            type="text"
+            maxlength="2000"
+          >
+
+          <label for="productImages">Galeria de imagens (caminhos locais, um por linha)</label>
+          <textarea id="productImages" name="productImages" rows="4" placeholder="/images/products/mouse-sem-fio-01.png
+/images/products/mouse-sem-fio-02.svg
+/images/products/mouse-sem-fio-03.svg"></textarea>
+          <small>Use arquivos dentro de public/images/products/. Até 12 imagens por produto.</small>
+
+          <label for="productStock">Estoque</label>
+          <input
+            id="productStock"
+            name="productStock"
+            type="number"
+            min="0"
+            step="1"
+            required
+          >
+
+          <label class="checkbox-label" for="productActive">
+            <input
+              id="productActive"
+              name="productActive"
+              type="checkbox"
+              checked
+            >
+            Produto ativo
+          </label>
+
+          <div class="actions">
+            <button id="saveProductButton" type="submit">
+              Salvar produto
+            </button>
+
+            <button
+              id="cancelEdit"
+              class="secondary"
+              type="button"
+            >
+              Limpar formulário
+            </button>
+          </div>
+
+          <p
+            id="productMessage"
+            class="message"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Produtos cadastrados</h2>
+        <p class="hint">
+          A lista inclui produtos ativos e inativos.
+        </p>
+        <div id="productList" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

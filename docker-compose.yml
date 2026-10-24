@@ -13,6 +13,7 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./db/create-app-user.sh:/docker-entrypoint-initdb.d/02-create-app-user.sh:ro
       - ./db/create-app-user.sql:/scripts/create-app-user.sql:ro
+      - ./db/migrations/001_admin_panel.sql:/scripts/migrations/001_admin_panel.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -28,7 +29,7 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3000
       DB_HOST: db
       DB_PORT: 5432
@@ -36,6 +37,9 @@ services:
       DB_USER: ${DB_USER:-lojatech_app}
       DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Defina ADMIN_USERNAME no arquivo .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no arquivo .env}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Defina ADMIN_SESSION_SECRET no arquivo .env}
     ports:
       # Para acesso público em produção, prefira proxy reverso com HTTPS.
       # Restrinja a porta no Security Group; idealmente não exponha 3000 diretamente.

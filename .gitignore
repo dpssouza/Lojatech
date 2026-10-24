@@ -23,3 +23,10 @@ Thumbs.db
 *.dump
 *.sql.bak
 *.backup
+
+# Backups de codigo
+*.bak
+*.pre-integracao.bak
+
+# Backups temporarios de codificacao
+*.encoding-bak

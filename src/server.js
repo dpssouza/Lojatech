@@ -39,6 +39,29 @@ const pool = new Pool({
   max: Number(process.env.DB_POOL_MAX || 10),
 });
 
+// Migração compatível com volumes PostgreSQL já existentes. As imagens da galeria
+// ficam referenciadas por caminhos locais dentro de public/images/products.
+const schemaReady = Promise.resolve().then(async () => {
+  const galleryByName = {
+    'teclado mecânico': ['/images/products/teclado-mecanico-01.svg','/images/products/teclado-mecanico-02.svg','/images/products/teclado-mecanico-03.svg'],
+    'mouse sem fio': ['/images/products/mouse-sem-fio-01.png','/images/products/mouse-sem-fio-02.svg','/images/products/mouse-sem-fio-03.svg'],
+    'headset usb': ['/images/products/headset-usb-01.svg','/images/products/headset-usb-02.svg','/images/products/headset-usb-03.svg'],
+    'webcam hd': ['/images/products/webcam-hd-01.svg','/images/products/webcam-hd-02.svg','/images/products/webcam-hd-03.svg'],
+    'hub usb': ['/images/products/hub-usb-01.svg','/images/products/hub-usb-02.svg','/images/products/hub-usb-03.svg'],
+    'fone de ouvido bluetooth': ['/images/products/fone-bluetooth-01.svg','/images/products/fone-bluetooth-02.svg','/images/products/fone-bluetooth-03.svg'],
+    'fone bluetooth': ['/images/products/fone-bluetooth-01.svg','/images/products/fone-bluetooth-02.svg','/images/products/fone-bluetooth-03.svg'],
+    'ssd 1tb': ['/images/products/ssd-1tb-01.svg','/images/products/ssd-1tb-02.svg','/images/products/ssd-1tb-03.svg']
+  };
+  for (const [name, urls] of Object.entries(galleryByName)) {
+    await pool.query("UPDATE products SET image_urls = $1::jsonb, image_url = $2 WHERE LOWER(name) = $3 AND (image_urls = '[]'::jsonb OR image_urls IS NULL)", [JSON.stringify(urls), urls[0], name]);
+  }
+  const genericGallery = ['/images/products/produto-generico-01.svg','/images/products/produto-generico-02.svg','/images/products/produto-generico-03.svg'];
+  await pool.query("UPDATE products SET image_urls = $1::jsonb, image_url = $2 WHERE image_urls = '[]'::jsonb OR image_urls IS NULL", [JSON.stringify(genericGallery), genericGallery[0]]);
+});
+app.use(async (_req, _res, next) => {
+  try { await schemaReady; next(); } catch (error) { next(error); }
+});
+
 pool.on('error', (error) => {
   console.error('Erro inesperado em conexão ociosa com PostgreSQL:', error.message);
 });
@@ -52,7 +75,7 @@ app.use(helmet({
       fontSrc: ["'self'", 'https:', 'data:'],
       formAction: ["'self'"],
       frameAncestors: ["'none'"],
-      imgSrc: ["'self'", 'https://images.unsplash.com', 'data:'],
+      imgSrc: ["'self'","https://images.unsplash.com","https://media.istockphoto.com","data:"],
       objectSrc: ["'none'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'"],
@@ -70,6 +93,8 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
   index: 'index.html',
   maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0,
 }));
+
+app.get('/produtos', (_req, res) => res.redirect('/#produtos'));
 
 const productLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -100,7 +125,7 @@ app.get('/api/health', async (_req, res) => {
 app.get('/api/products', productLimiter, async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, name, description, price, image_url, stock FROM products WHERE active = TRUE ORDER BY id'
+      "SELECT id, name, description, price, image_url, image_urls, stock FROM products WHERE active = TRUE ORDER BY id"
     );
     res.json(rows);
   } catch (error) {
@@ -244,6 +269,15 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   } finally {
     if (client) client.release();
   }
+});
+
+// Painel administrativo da LojaTech
+const createAdminRouter = require('./admin');
+app.use('/api/admin', createAdminRouter(pool));
+
+// Página do painel administrativo
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
 
 app.use('/api', (_req, res) => {

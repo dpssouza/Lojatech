@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Detalhes do produto na LojaTech.">
+  <title>Produto | LojaTech</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/produto.css">
+  <script src="/produto.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="LojaTech página inicial"><span class="brand-mark">L</span> LojaTech</a>
+    <div class="topbar-note">Tecnologia para o dia a dia</div>
+    <a class="cart-toggle product-cart-link" href="/?abrirCarrinho=1">Ver carrinho</a>
+  </header>
+
+  <main class="product-detail-main">
+    <a class="back-to-catalog" href="/#produtos">← Voltar ao catálogo</a>
+    <p id="detail-status" class="status" role="status">Carregando produto...</p>
+
+    <section id="product-detail" class="product-detail" hidden>
+      <div class="detail-gallery">
+        <div id="detail-thumbnails" class="detail-thumbnails" aria-label="Imagens do produto"></div>
+        <div class="detail-main-image-wrap">
+          <img id="detail-main-image" class="detail-main-image" alt="">
+        </div>
+      </div>
+
+      <div class="detail-copy">
+        <p class="eyebrow">DETALHES DO PRODUTO</p>
+        <h1 id="detail-name"></h1>
+        <p id="detail-description" class="detail-description"></p>
+        <p id="detail-price" class="detail-price"></p>
+        <p id="detail-stock" class="detail-stock"></p>
+        <label class="quantity-label" for="detail-quantity">Quantidade</label>
+        <div class="detail-actions">
+          <input id="detail-quantity" type="number" min="1" value="1" inputmode="numeric">
+          <button id="detail-add" class="primary-button" type="button">Adicionar ao carrinho</button>
+        </div>
+        <p id="detail-message" class="detail-message" role="status"></p>
+        <div class="detail-benefits">
+          <p>✓ Produto disponível conforme estoque informado</p>
+          <p>✓ Compra demonstrativa para o projeto LojaTech</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="related-section" class="related-section" hidden>
+      <div class="related-heading">
+        <div>
+          <p class="eyebrow">CONTINUE EXPLORANDO</p>
+          <h2>Você também pode gostar</h2>
+        </div>
+        <a href="/#produtos" class="related-all">Ver catálogo →</a>
+      </div>
+      <div id="related-products" class="related-products"></div>
+    </section>
+  </main>
+
+  <footer><span>LojaTech — projeto educacional</span><span>Node.js · PostgreSQL · Docker</span></footer>
+</body>
+</html>
