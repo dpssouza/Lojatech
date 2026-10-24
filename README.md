@@ -133,14 +133,14 @@ que deseja guardar o projeto. O comando a seguir criará uma pasta
 chamada `lojatech` dentro da pasta atual.
 
 ``` bash
-git clone https://github.com/dpssouza/LojaTech.git lojatech
+git clone https://github.com/dpssouza/Lojatech.git lojatech
 ```
 
 **Explicando o comando:**
 
 -   `git`: executa o programa Git.
 -   `clone`: significa copiar um repositório remoto para o computador.
--   `https://github.com/dpssouza/LojaTech.git`: endereço do repositório
+-   `https://github.com/dpssouza/Lojatech.git`: endereço do repositório
     do projeto.
 -   `lojatech`: nome da pasta local que será criada. O nome em
     minúsculas evita confusão com maiúsculas e minúsculas no Linux.
@@ -229,10 +229,22 @@ DB_ADMIN_PASSWORD=SUBSTITUA_POR_UM_SEGREDO_ADMIN_FORTE
 DB_USER=lojatech_app
 DB_PASSWORD=SUBSTITUA_POR_OUTRO_SEGREDO_FORTE_E_UNICO
 DB_POOL_MAX=10
+APP_BIND_IP=127.0.0.1
+APP_HOST_PORT=3000
+ADMIN_USERNAME=SEU_USUARIO_ADMIN
+ADMIN_PASSWORD=SUBSTITUA_POR_UMA_SENHA_FORTE
+ADMIN_SESSION_SECRET=SUBSTITUA_POR_UMA_CHAVE_ALEATORIA_LONGA
 ```
 
-Substitua os dois valores de exemplo por senhas fortes e diferentes. Não
-use os textos de exemplo como senhas reais.
+Substitua os valores fictícios antes de iniciar a aplicação. Configure
+senhas fortes e diferentes para `DB_ADMIN_PASSWORD`, `DB_PASSWORD` e
+`ADMIN_PASSWORD`. Defina também um nome de usuário próprio em
+`ADMIN_USERNAME` e uma chave aleatória longa e exclusiva em
+`ADMIN_SESSION_SECRET`. Não use os textos de exemplo como valores reais.
+
+A variável `ADMIN_SESSION_SECRET` protege as sessões de administração;
+não reutilize senhas, tokens ou chaves de outros serviços. Gere um valor
+aleatório longo e guarde-o em segurança.
 
   -----------------------------------------------------------------------
   Variável                            O que significa
@@ -258,6 +270,14 @@ use os textos de exemplo como senhas reais.
 
   `APP_HOST_PORT`                     Porta do computador usada para acessar
                                       a aplicação (por padrão, `3000`).
+
+  `ADMIN_USERNAME`                    Nome de usuário para entrar no painel
+                                      administrativo.
+
+  `ADMIN_PASSWORD`                    Senha forte para o painel administrativo.
+
+  `ADMIN_SESSION_SECRET`              Segredo aleatório longo usado para
+                                      proteger as sessões administrativas.
   -----------------------------------------------------------------------
 
 **Por que existem duas senhas?** A conta administrativa serve para
@@ -672,9 +692,11 @@ cp .env.example .env
 nano .env
 ```
 
-Substitua `DB_ADMIN_PASSWORD` e `DB_PASSWORD` por senhas fortes e
-**diferentes entre si**. Não reutilize senhas pessoais nem publique o
-arquivo `.env`.
+Substitua os valores fictícios de `DB_ADMIN_PASSWORD`, `DB_PASSWORD` e
+`ADMIN_PASSWORD` por senhas fortes e diferentes entre si. Configure
+`ADMIN_USERNAME` com um nome de usuário próprio e troque
+`ADMIN_SESSION_SECRET` por uma chave aleatória longa e exclusiva. Não
+reutilize senhas pessoais nem publique o arquivo `.env`.
 
 Na EC2, confira também estas duas linhas:
 
@@ -951,54 +973,67 @@ Se continuar sem funcionar, confira também o IPv4 público, a conectividade de 
 
 ## 12. Configurar domínio e HTTPS
 
-Nesta etapa, vamos disponibilizar a LojaTech por meio de um domínio público e habilitar uma conexão HTTPS segura. Para isso, utilizaremos o DuckDNS para associar um domínio ao IP público da EC2 e o Caddy como proxy reverso, responsável por obter e renovar automaticamente o certificado TLS do Let's Encrypt.
+Esta etapa é opcional. Ela publica a loja por um domínio e habilita HTTPS
+usando o DuckDNS para apontar o domínio para o IP público da EC2 e o Caddy
+como proxy reverso. Faça esta etapa somente depois de confirmar que a loja
+funciona pela porta 3000.
 
-### Passo 1 — Configurar o domínio no DuckDNS
+> **Importante:** o domínio `lojatech.duckdns.org` é apenas um exemplo.
+> Crie um domínio próprio na sua conta DuckDNS e use exatamente esse nome
+> tanto no `Caddyfile` quanto no navegador. Não presuma que o nome de exemplo
+> esteja disponível.
 
-1. Acesse o site do [DuckDNS](https://www.duckdns.org/).
-2. Entre na sua conta e crie ou selecione o domínio `lojatech.duckdns.org`.
-3. Configure o domínio para apontar para o IP público atual da sua instância EC2.
-4. Salve a configuração e confirme se o domínio está associado ao IP correto.
+### Passo 1 — Criar e configurar o domínio
 
-**Atenção:** o IP público de uma EC2 pode mudar quando a instância é parada e iniciada novamente, caso você não utilize um Elastic IP. Se isso acontecer, atualize o endereço no DuckDNS.
+1. Acesse [DuckDNS](https://www.duckdns.org/) e entre na sua conta.
+2. Crie ou selecione um subdomínio disponível.
+3. Configure-o para apontar para o IPv4 público atual da sua EC2.
+4. Confirme que o domínio resolve para o IP da instância antes de continuar.
 
-### Passo 2 — Liberar as portas necessárias na AWS
+O IP público pode mudar quando a EC2 é parada e iniciada novamente, caso
+você não utilize um Elastic IP. Se isso acontecer, atualize o registro DNS.
 
-No console AWS, abra a instância EC2 e acesse as regras de entrada do grupo de segurança associado a ela.
+### Passo 2 — Ajustar o Security Group
 
-Confira se existem estas regras:
+No grupo de segurança da EC2, mantenha estas regras de entrada:
 
 | Tipo | Protocolo | Porta | Origem |
 |---|---|---:|---|
+| SSH | TCP | 22 | Seu IP (`My IP`) |
 | HTTP | TCP | 80 | `0.0.0.0/0` |
 | HTTPS | TCP | 443 | `0.0.0.0/0` |
 
-Essas portas permitem que o Caddy receba as solicitações HTTP e HTTPS da Internet.
+Não abra a porta `5432` do PostgreSQL. Depois de confirmar que HTTPS
+funciona, remova a regra TCP 3000 criada para o teste inicial.
 
-**Segurança:** não libere as portas 3000 e 5432 para toda a Internet. Depois de confirmar que o HTTPS está funcionando, remova a regra de entrada TCP 3000 do Security Group. A aplicação será acessada por meio do Caddy, enquanto o PostgreSQL permanecerá restrito à rede interna dos contêineres.
+### Passo 3 — Configurar a aplicação para uso atrás do Caddy
 
-### Passo 3 — Restringir a porta da aplicação à própria EC2
-
-Depois de preparar o acesso inicial por HTTP, a porta 3000 não precisa mais ficar acessível diretamente pela Internet. Edite o arquivo `.env` na EC2:
+Dentro da sessão SSH da EC2, na pasta `lojatech`, edite o arquivo `.env`:
 
 ```bash
 nano .env
 ```
 
-Confira estas configurações:
+Configure estas linhas:
 
 ```dotenv
 APP_BIND_IP=127.0.0.1
 APP_HOST_PORT=3000
 ```
 
-Salve o arquivo. A aplicação continuará disponível localmente na EC2, e o Caddy encaminhará as solicitações recebidas pelo domínio para o serviço `app` dentro da rede Docker.
+Salve com `Ctrl+O`, pressione `Enter` e saia com `Ctrl+X`. Essa configuração
+limita a publicação da porta 3000 ao próprio host EC2. O Caddy encaminhará
+as solicitações para o serviço `app` pela rede interna do Docker Compose.
 
-> Se ainda estiver testando a etapa anterior por `http://IP_PUBLICO_DA_EC2:3000`, conclua esse teste antes de mudar `APP_BIND_IP` para `127.0.0.1`.
+### Passo 4 — Criar o arquivo Caddyfile
 
-### Passo 4 — Configurar o Caddy
+Na pasta `lojatech`, crie ou edite `Caddyfile`:
 
-Na pasta do projeto na EC2, crie ou edite o arquivo `Caddyfile` com o seguinte conteúdo:
+```bash
+nano Caddyfile
+```
+
+Use o seu domínio real no lugar de `lojatech.duckdns.org`:
 
 ```caddyfile
 lojatech.duckdns.org {
@@ -1007,37 +1042,45 @@ lojatech.duckdns.org {
 }
 ```
 
-Entenda as diretivas:
+- O nome na primeira linha é o domínio que os visitantes vão acessar.
+- `encode zstd gzip` habilita compressão compatível com o cliente.
+- `reverse_proxy app:3000` encaminha as solicitações ao serviço da aplicação
+  dentro da rede Docker.
 
-- `lojatech.duckdns.org`: domínio utilizado para acessar a loja.
-- `encode zstd gzip`: habilita a compressão das respostas HTTP quando compatível com o cliente.
-- `reverse_proxy app:3000`: encaminha as solicitações para o serviço da aplicação na porta 3000, dentro da rede Docker.
+Salve o arquivo e saia do editor.
 
-O Caddy pode obter e renovar automaticamente o certificado TLS quando o domínio estiver apontando para a EC2 e as portas necessárias estiverem acessíveis.
+### Passo 5 — Adicionar o serviço Caddy ao Docker Compose
 
-### Passo 5 — Conferir o Docker Compose
+Abra `docker-compose.yml`:
 
-O arquivo `docker-compose.yml` deve conter um serviço Caddy semelhante a este:
-
-```yaml
-caddy:
-  image: caddy:2
-  restart: unless-stopped
-  ports:
-    - "80:80"
-    - "443:443"
-    - "443:443/udp"
-  volumes:
-    - ./Caddyfile:/etc/caddy/Caddyfile:ro
-    - caddy_data:/data
-    - caddy_config:/config
-  depends_on:
-    - app
-  security_opt:
-    - no-new-privileges:true
+```bash
+nano docker-compose.yml
 ```
 
-Na seção `volumes` do arquivo, também devem estar declarados os volumes persistentes do Caddy:
+Dentro de `services:`, adicione o bloco `caddy` abaixo no mesmo nível de
+indentação dos serviços `app` e `db`. Não o coloque dentro do bloco `app`:
+
+```yaml
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    security_opt:
+      - no-new-privileges:true
+```
+
+No final do arquivo, na seção de volumes de nível superior, mantenha o
+volume do banco que já existe e acrescente os volumes do Caddy. A estrutura
+será semelhante a esta (preserve quaisquer outros volumes já declarados):
 
 ```yaml
 volumes:
@@ -1046,105 +1089,89 @@ volumes:
   caddy_config:
 ```
 
-Neste exemplo, o Caddy e a aplicação utilizam a rede padrão criada pelo Docker Compose. Se o seu `docker-compose.yml` definir uma rede personalizada, conecte os serviços `caddy` e `app` à mesma rede e use o nome real do serviço da aplicação.
+**Atenção:** se o volume do PostgreSQL no seu `docker-compose.yml` tiver
+outro nome, mantenha o nome que já está no arquivo. Não substitua nem remova
+o volume existente, pois ele pode conter os dados da loja. O Caddy e o
+serviço `app` precisam estar na mesma rede Docker; com a rede padrão do
+Compose isso acontece automaticamente.
 
-### Passo 6 — Validar e iniciar os serviços
+Salve o arquivo e saia do editor.
 
-Dentro da pasta `lojatech`, execute primeiro a validação do arquivo Compose:
+### Passo 6 — Validar e iniciar
+
+Antes de iniciar, valide a sintaxe do Compose:
 
 ```bash
 sudo docker compose config -q
 ```
 
-Se não houver erros, inicie ou recrie os serviços:
+Se o comando terminar sem erro, recrie os serviços:
 
 ```bash
-sudo docker compose up -d
+sudo docker compose up -d --build
 ```
 
-Depois que o contêiner `caddy` estiver em execução, valide a configuração:
+Confira o estado dos serviços:
+
+```bash
+sudo docker compose ps
+```
+
+Valide a configuração do Caddy:
 
 ```bash
 sudo docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile
 ```
 
-Confira o estado dos contêineres:
-
-```bash
-sudo docker compose ps
-```
-
-Para consultar os registros do Caddy:
+Consulte os logs se necessário:
 
 ```bash
 sudo docker compose logs --tail=100 caddy
 ```
 
-Procure mensagens que indiquem a obtenção bem-sucedida do certificado TLS. A emissão depende de o domínio estar corretamente configurado e de os desafios de validação estarem acessíveis.
+O Caddy poderá solicitar e renovar automaticamente o certificado TLS
+quando o domínio estiver apontando para a EC2 e as portas 80 e 443 estiverem
+acessíveis. A emissão do certificado não é garantida até que DNS e regras
+de rede estejam corretos.
 
-### Passo 7 — Testar o acesso HTTPS
+### Passo 7 — Testar HTTPS e fechar a porta 3000
 
-Abra o navegador e acesse:
+Abra no navegador o domínio que você configurou, por exemplo:
 
-**https://lojatech.duckdns.org**
+`https://lojatech.duckdns.org`
 
-Verifique se:
-
-- A página da LojaTech é carregada.
-- O navegador indica uma conexão HTTPS válida.
-- O certificado corresponde ao domínio utilizado.
-- A aplicação continua funcionando normalmente.
-
-Você também pode testar a resposta HTTP a partir de um terminal:
+Confirme que a página carrega e que o navegador mostra um certificado válido
+para o domínio utilizado. Também é possível testar os cabeçalhos:
 
 ```bash
 curl -I https://lojatech.duckdns.org
 ```
 
-O comando solicita apenas os cabeçalhos da resposta. Um resultado HTTP bem-sucedido confirma que o servidor respondeu à solicitação, embora não substitua a verificação da aplicação no navegador.
+Substitua o domínio de exemplo pelo seu. Depois de confirmar que HTTPS
+funciona, remova a regra TCP 3000 do Security Group. Mantenha SSH restrito
+ao seu IP e as portas 80 e 443 liberadas para o acesso público.
 
-Depois de confirmar que o domínio funciona com HTTPS:
+### Problemas comuns com HTTPS
 
-1. Volte às regras de entrada do Security Group da EC2.
-2. Remova a regra TCP 3000 criada para o teste inicial.
-3. Mantenha SSH (22) restrito ao seu IP e HTTP (80) e HTTPS (443) liberadas conforme necessário para o serviço público.
-4. Confirme que a aplicação continua funcionando em `https://lojatech.duckdns.org`.
+- **O domínio não abre:** confirme que o DNS aponta para o IPv4 público atual.
+- **A conexão expira ou é recusada:** confira o estado dos serviços, o
+  Security Group e os logs do Caddy.
+- **O certificado não é emitido:** confirme o domínio e o acesso externo às
+  portas 80 e 443.
+- **O proxy não encontra a aplicação:** confira se o serviço se chama `app`
+  e se está na mesma rede Docker que o Caddy.
 
-### Passo 8 — Diagnosticar problemas comuns
-
-**O domínio não abre**
-
-Confira o endereço configurado no DuckDNS e confirme se ele aponta para o IP público atual da EC2.
-
-**A conexão é recusada ou expira**
-
-Confira o estado da instância, as regras de entrada do grupo de segurança e os contêineres:
+Comandos úteis para diagnóstico:
 
 ```bash
 sudo docker compose ps
 sudo docker compose logs --tail=100 caddy
-```
-
-**O certificado não é emitido**
-
-Confira o domínio, as portas 80 e 443, a resolução DNS e os registros do Caddy. A emissão do certificado depende da validação do domínio pelo serviço certificador.
-
-**A aplicação não responde pelo domínio**
-
-Teste a aplicação localmente na EC2:
-
-```bash
-curl -I http://127.0.0.1:3000
-```
-
-Se necessário, consulte também os registros da aplicação:
-
-```bash
 sudo docker compose logs --tail=100 app
 ```
 
-**Importante:** não compartilhe arquivos `.env`, senhas do banco, tokens do DuckDNS ou chaves privadas. O arquivo `.env` deve permanecer fora do repositório Git.
+Não compartilhe `.env`, senhas, tokens do DuckDNS ou chaves privadas.
 
+------------------------------------------------------------------------
 
 ## 13. Encerrar o laboratório e evitar custos
 
@@ -1187,7 +1214,9 @@ LojaTech/
 ├── db/
 │   ├── init.sql
 │   ├── create-app-user.sh
-│   └── create-app-user.sql
+│   ├── create-app-user.sql
+│   └── migrations/
+│       └── 001_admin_panel.sql
 ├── public/
 │   ├── index.html
 │   ├── styles.css
@@ -1212,6 +1241,11 @@ LojaTech/
   `db/init.sql`                       Cria a estrutura inicial e os dados
                                       de exemplo do banco.
 
+  `db/migrations/001_admin_panel.sql` Adiciona estruturas usadas pelo painel
+                                      administrativo. É aplicada pelo fluxo
+                                      de inicialização do projeto em um banco
+                                      recém-criado, conforme os scripts do DB.
+
   `public/`                           Contém os arquivos da interface
                                       web.
 
@@ -1230,8 +1264,10 @@ LojaTech/
   `docker-compose.yml`                Define como executar os serviços e
                                       conectá-los.
 
-  `Caddyfile`                          Configura o Caddy como proxy reverso
-                                      e define o domínio usado no HTTPS.
+  `Caddyfile`                         Configuração do Caddy usada na etapa
+                                      opcional de domínio e HTTPS. O serviço
+                                      Caddy também precisa ser adicionado ao
+                                      Docker Compose conforme a seção 12.
 
   `package.json`                      Lista informações, dependências e
                                       comandos do projeto.
@@ -1253,7 +1289,8 @@ ao GitHub.
 
 ------------------------------------------------------------------------
 
-**Parabéns por concluir o laboratório!** Você baixou um projeto,
-executou uma aplicação com Docker, conectou serviços e publicou uma loja
-virtual didática em uma máquina virtual na nuvem, com acesso HTTPS por domínio. Continue praticando e
-lembre-se de usar dados fictícios durante as atividades.
+**Parabéns por concluir o laboratório!** Você baixou um projeto, executou
+uma aplicação com Docker e conectou os serviços. Se também concluiu a etapa
+opcional de domínio e HTTPS, terá publicado a loja didática com acesso seguro
+por domínio. Continue praticando e use apenas dados fictícios durante as
+atividades.
