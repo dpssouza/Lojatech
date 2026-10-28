@@ -25,45 +25,56 @@ function readCart() {
   } catch { return new Map(); }
 }
 function showGallery(urls, alt) {
-  const validUrls = [...new Set((Array.isArray(urls) ? urls : []).filter(url => typeof url === 'string' && url.startsWith('/images/products/')))];
-  if (!validUrls.length) {
-    mainImage.removeAttribute('src');
-    mainImage.alt = 'Imagem não cadastrada';
-    mainImage.classList.add('image-unavailable');
-    thumbnails.innerHTML = '';
-    return;
-  }
+  const fallbackImage = '/images/products/produto-generico-01.svg';
+  const validUrls = [...new Set(
+    (Array.isArray(urls) ? urls : []).filter(
+      url => typeof url === 'string' &&
+        url.startsWith('/images/products/')
+    )
+  )];
+
+  const gallery = validUrls.length ? validUrls : [fallbackImage];
+
   function selectImage(url, selectedButton) {
     mainImage.classList.remove('image-unavailable');
     mainImage.src = url;
     mainImage.alt = alt;
+
     mainImage.onerror = () => {
-      mainImage.removeAttribute('src');
-      mainImage.alt = 'Imagem indisponível';
-      mainImage.classList.add('image-unavailable');
+      mainImage.onerror = null;
+      mainImage.src = fallbackImage;
+      mainImage.alt = `${alt} — imagem ilustrativa`;
     };
+
     thumbnails.querySelectorAll('.detail-thumbnail').forEach(button => {
       const active = button === selectedButton;
       button.classList.toggle('is-active', active);
       button.setAttribute('aria-pressed', String(active));
     });
   }
+
   thumbnails.innerHTML = '';
-  validUrls.forEach((url, index) => {
+
+  gallery.forEach((url, index) => {
     const thumb = document.createElement('button');
     thumb.type = 'button';
     thumb.className = `detail-thumbnail${index === 0 ? ' is-active' : ''}`;
-    thumb.setAttribute('aria-label', `Ver imagem ${index + 1} de ${validUrls.length}`);
+    thumb.setAttribute('aria-label', `Ver imagem ${index + 1} de ${gallery.length}`);
     thumb.setAttribute('aria-pressed', String(index === 0));
+
     const img = document.createElement('img');
     img.src = url;
     img.alt = '';
     img.loading = 'lazy';
     img.onerror = () => thumb.remove();
+
     thumb.appendChild(img);
     thumb.addEventListener('click', () => selectImage(url, thumb));
     thumbnails.appendChild(thumb);
-    if (index === 0) selectImage(url, thumb);
+
+    if (index === 0) {
+      selectImage(url, thumb);
+    }
   });
 }
 

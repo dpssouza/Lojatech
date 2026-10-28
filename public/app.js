@@ -23,17 +23,52 @@ async function loadProducts() {
 }
 
 function renderProducts() {
-  grid.innerHTML = products.map(product => `
-    <article class="product-card">
-      <a href="/produto.html?id=${encodeURIComponent(product.id)}" aria-label="Ver detalhes de ${escapeHtml(product.name)}"><img class="product-image" src="${escapeHtml(product.image_url || '')}" alt="${escapeHtml(product.name)}" loading="lazy"></a>
-      <div class="product-info"><h3>${escapeHtml(product.name)}</h3><p>${escapeHtml(product.description)}</p>
-      <div class="product-bottom"><span class="price">${money(product.price)}</span><button class="add-button" data-add="${product.id}" ${Number(product.stock) < 1 ? 'disabled' : ''}>Adicionar +</button></div>
-      <div class="stock">${product.stock} em estoque</div></div>
-    </article>`).join('');
+  const fallbackImage = '/images/products/produto-generico-01.svg';
+
+  grid.innerHTML = products.map(product => {
+    const gallery = Array.isArray(product.image_urls)
+      ? product.image_urls
+      : [];
+
+    const imageUrl = gallery.find(url =>
+      typeof url === 'string' && url.startsWith('/images/products/')
+    ) || (
+      typeof product.image_url === 'string' &&
+      product.image_url.startsWith('/images/products/')
+        ? product.image_url
+        : fallbackImage
+    );
+
+    const productLink = `/produto.html?id=${encodeURIComponent(product.id)}`;
+
+    return `
+      <article class="product-card">
+        <a class="product-card-link" href="${productLink}" aria-label="Ver detalhes de ${escapeHtml(product.name)}">
+          <img class="product-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}" loading="lazy">
+        </a>
+        <div class="product-info">
+          <h3><a class="product-name-link" href="${productLink}">${escapeHtml(product.name)}</a></h3>
+          <p>${escapeHtml(product.description || '')}</p>
+          <div class="product-bottom">
+            <span class="price">${money(product.price)}</span>
+            <button class="add-button" data-add="${Number(product.id)}" ${Number(product.stock) < 1 ? 'disabled' : ''}>Adicionar +</button>
+          </div>
+          <div class="stock">${Number(product.stock)} em estoque</div>
+        </div>
+      </article>`;
+  }).join('');
+
   grid.querySelectorAll('.product-image').forEach(image => {
-    image.addEventListener('error', () => { image.style.visibility = 'hidden'; }, { once: true });
+    image.addEventListener('error', () => {
+      if (!image.src.endsWith('/images/products/produto-generico-01.svg')) {
+        image.src = '/images/products/produto-generico-01.svg';
+      }
+    });
   });
-  grid.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => addToCart(Number(button.dataset.add))));
+
+  grid.querySelectorAll('[data-add]').forEach(button => {
+    button.addEventListener('click', () => addToCart(Number(button.dataset.add)));
+  });
 }
 
 function escapeHtml(value) {

@@ -1,9 +1,184 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const fs = require('fs/promises');
+const path = require('path');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const rateLimit = require('express-rate-limit');
+
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_HOSTS = new Set([
+  'images.kabum.com.br',
+  'img.terabyteshop.com.br'
+]);
+
+const IMAGE_EXTENSIONS = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif'
+};
+
+function isAllowedImageUrl(value) {
+  if (typeof value !== 'string' || value.length > 2000) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' &&
+      url.port === '' &&
+      !url.username &&
+      !url.password &&
+      ALLOWED_IMAGE_HOSTS.has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+async function downloadExternalImage(value) {
+  if (!isAllowedImageUrl(value)) {
+    throw new Error('Use uma URL HTTPS de imagem da KaBuM ou da Terabyte.');
+  }
+
+  let currentUrl = value;
+  let response;
+
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    response = await fetch(currentUrl, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'LojaTech-ImageImporter/1.0' }
+    });
+
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+
+    const location = response.headers.get('location');
+    if (!location || redirects === 3) {
+      throw new Error('A imagem redirecionou muitas vezes ou o redirecionamento é inválido.');
+    }
+
+    const nextUrl = new URL(location, currentUrl).toString();
+    if (!isAllowedImageUrl(nextUrl)) {
+      throw new Error('O redirecionamento da imagem aponta para um domínio não autorizado.');
+    }
+
+    currentUrl = nextUrl;
+  }
+
+  if (!response || !response.ok) {
+    throw new Error('Não foi possível baixar a imagem do endereço informado.');
+  }
+
+  const contentType = (response.headers.get('content-type') || '')
+    .split(';')[0].trim().toLowerCase();
+  const extension = IMAGE_EXTENSIONS[contentType];
+
+  if (!extension) {
+    throw new Error('O endereço não retornou uma imagem JPEG, PNG, WebP ou GIF.');
+  }
+
+  const contentLength = Number(response.headers.get('content-length') || 0);
+  if (contentLength > MAX_IMAGE_BYTES) {
+    throw new Error('A imagem deve ter no máximo 5 MB.');
+  }
+
+  if (!response.body) {
+    throw new Error('Não foi possível ler o conteúdo da imagem.');
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_IMAGE_BYTES) {
+        await reader.cancel();
+        throw new Error('A imagem deve ter no máximo 5 MB.');
+      }
+
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (totalBytes === 0) {
+    throw new Error('O arquivo de imagem está vazio.');
+  }
+
+  const filename = `${crypto.randomBytes(16).toString('hex')}${extension}`;
+  const directory = path.join(__dirname, '..', 'public', 'images', 'products');
+  const destination = path.join(directory, filename);
+
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(destination, Buffer.concat(chunks), { flag: 'wx' });
+
+  return `/images/products/${filename}`;
+}
+
+
+function isLocalImagePath(value) {
+  return typeof value === 'string' &&
+    /^\/images\/products\/[A-Za-z0-9._-]+$/.test(value) &&
+    !value.includes('..');
+}
+
+function isValidImageReference(value) {
+  return value === '' ||
+    value === null ||
+    value === undefined ||
+    isLocalImagePath(value) ||
+    isAllowedImageUrl(value);
+}
+
+async function normalizeProductImages(body) {
+  const cache = new Map();
+
+  async function normalize(value) {
+    if (value === '' || value === null || value === undefined) return value;
+    if (isLocalImagePath(value)) return value;
+
+    if (!isAllowedImageUrl(value)) {
+      throw new Error(
+        'Informe um caminho local válido ou uma URL HTTPS de imagem da KaBuM ou da Terabyte.'
+      );
+    }
+
+    if (!cache.has(value)) {
+      cache.set(value, await downloadExternalImage(value));
+    }
+
+    return cache.get(value);
+  }
+
+  try {
+    if (Object.prototype.hasOwnProperty.call(body, 'image_url')) {
+      body.image_url = await normalize(body.image_url);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'image_urls')) {
+      if (!Array.isArray(body.image_urls)) {
+        throw new Error('A galeria de imagens deve ser uma lista.');
+      }
+
+      const normalized = [];
+      for (const value of body.image_urls) {
+        normalized.push(await normalize(value));
+      }
+      body.image_urls = normalized;
+    }
+
+    return null;
+  } catch (error) {
+    return error.message || 'Não foi possível processar as imagens.';
+  }
+}
 
 function createAdminRouter(pool) {
   const router = express.Router();
@@ -110,13 +285,20 @@ function createAdminRouter(pool) {
     if (
       image_url !== null &&
       image_url !== undefined &&
-      (typeof image_url !== 'string' || image_url.length > 2000)
+      image_url !== '' &&
+      (typeof image_url !== 'string' || image_url.length > 2000 ||
+        !isValidImageReference(image_url))
     ) {
-      return 'O endereço da imagem é inválido.';
+      return 'A imagem principal deve ser um caminho local válido ou uma URL HTTPS autorizada.';
     }
 
-    if (image_urls !== undefined && (!Array.isArray(image_urls) || image_urls.length > 12 || image_urls.some(url => typeof url !== 'string' || url.length > 500 || !url.startsWith('/images/products/')))) {
-      return 'Use até 12 caminhos locais em /images/products/ (um por linha).';
+    if (
+      image_urls !== undefined &&
+      (!Array.isArray(image_urls) || image_urls.length > 12 ||
+        image_urls.some(url => typeof url !== 'string' ||
+          url.length > 2000 || !isValidImageReference(url)))
+    ) {
+      return 'Informe até 12 caminhos locais ou URLs HTTPS autorizadas na galeria.';
     }
 
     if (!Number.isSafeInteger(stock) || stock < 0) {
@@ -131,12 +313,29 @@ function createAdminRouter(pool) {
   }
 
   function productValues(body) {
+    const genericGallery = [
+      '/images/products/produto-generico-01.svg',
+      '/images/products/produto-generico-02.svg',
+      '/images/products/produto-generico-03.svg'
+    ];
+
+    const mainImage = body.image_url?.trim() || null;
+    const suppliedGallery = Array.isArray(body.image_urls)
+      ? body.image_urls
+      : [];
+
+    const imageUrls = suppliedGallery.length
+      ? suppliedGallery
+      : (mainImage ? [mainImage] : genericGallery);
+
+    const imageUrl = mainImage || imageUrls[0] || genericGallery[0];
+
     return [
       body.name.trim(),
       body.description.trim(),
       body.price,
-      body.image_url?.trim() || (Array.isArray(body.image_urls) ? body.image_urls[0] : null) || null,
-      JSON.stringify(Array.isArray(body.image_urls) ? body.image_urls : []),
+      imageUrl,
+      JSON.stringify(imageUrls),
       body.stock,
       body.active
     ];
@@ -236,7 +435,19 @@ function createAdminRouter(pool) {
 
   router.post('/products', requireAuth, requireCsrf, async (req, res, next) => {
     try {
-      const validationError = validateProduct(req.body);
+      let validationError = validateProduct(req.body);
+
+      if (validationError) {
+        return res.status(400).json({ error: validationError });
+      }
+
+      const imageError = await normalizeProductImages(req.body);
+
+      if (imageError) {
+        return res.status(400).json({ error: imageError });
+      }
+
+      validationError = validateProduct(req.body);
 
       if (validationError) {
         return res.status(400).json({ error: validationError });
@@ -264,7 +475,19 @@ function createAdminRouter(pool) {
         return res.status(400).json({ error: 'ID de produto inválido.' });
       }
 
-      const validationError = validateProduct(req.body);
+      let validationError = validateProduct(req.body);
+
+      if (validationError) {
+        return res.status(400).json({ error: validationError });
+      }
+
+      const imageError = await normalizeProductImages(req.body);
+
+      if (imageError) {
+        return res.status(400).json({ error: imageError });
+      }
+
+      validationError = validateProduct(req.body);
 
       if (validationError) {
         return res.status(400).json({ error: validationError });

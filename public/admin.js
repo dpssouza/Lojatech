@@ -231,8 +231,11 @@ productForm.addEventListener('submit', async (event) => {
     name: document.getElementById('productName').value.trim(),
     description: document.getElementById('productDescription').value.trim(),
     price: Number(document.getElementById('productPrice').value),
-    image_url: document.getElementById('productImage').value.trim() || null,
-    image_urls: document.getElementById('productImages').value.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+    image_url: document.getElementById('productImage').value.trim(),
+    image_urls: document.getElementById('productImages').value
+  .split(/\r?\n/)
+  .map(value => value.trim())
+  .filter(Boolean),
     stock: Number(document.getElementById('productStock').value),
     active: document.getElementById('productActive').checked
   };
