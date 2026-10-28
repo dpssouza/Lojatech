@@ -61,30 +61,10 @@ services:
     pids_limit: 100
     mem_limit: 256m
     cpus: 1.0
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-    networks:
-      - appnet
-    security_opt:
-      - no-new-privileges:true
-
+    
 networks:
   appnet:
     driver: bridge
 
 volumes:
   postgres_data:
-  caddy_data:
-  caddy_config:

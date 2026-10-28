@@ -178,7 +178,7 @@ Se o comando não funcionar, abra o VS Code pelo menu Iniciar, clique em
 Na pasta do projeto, você encontrará arquivos como:
 
 -   `Dockerfile`: instruções para construir a imagem da aplicação.
--   `docker-compose.yml`: configura os serviços da aplicação e do banco.
+-   `docker-compose.yml`: configura os serviços da aplicação e do banco no laboratório básico.
 -   `.env.example`: modelo das variáveis de configuração.
 -   `src/`: código do backend.
 -   `public/`: arquivos da interface web.
@@ -242,9 +242,42 @@ senhas fortes e diferentes para `DB_ADMIN_PASSWORD`, `DB_PASSWORD` e
 `ADMIN_USERNAME` e uma chave aleatória longa e exclusiva em
 `ADMIN_SESSION_SECRET`. Não use os textos de exemplo como valores reais.
 
-A variável `ADMIN_SESSION_SECRET` protege as sessões de administração;
-não reutilize senhas, tokens ou chaves de outros serviços. Gere um valor
-aleatório longo e guarde-o em segurança.
+A variável `ADMIN_SESSION_SECRET` protege as sessões de administração.
+O aplicativo exige uma chave com pelo menos 64 caracteres. Não reutilize
+senhas, tokens ou chaves de outros serviços.
+
+#### Gerar a chave no Windows PowerShell
+
+Copie e execute estes comandos **um por vez**, no PowerShell. Eles funcionam
+também em versões mais antigas do Windows PowerShell:
+
+```powershell
+$rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+$bytes = New-Object byte[] 32
+$rng.GetBytes($bytes)
+$secret = -join ($bytes | ForEach-Object { $_.ToString("x2") })
+$secret.Length
+$secret
+```
+
+O resultado de `$secret.Length` deve ser `64`. O comando `$secret` mostra
+a chave aleatória gerada. Copie esse valor e cole-o no arquivo `.env`, na
+linha `ADMIN_SESSION_SECRET=`, depois do sinal `=`.
+
+Por exemplo, a linha deve ficar assim (use a chave que você gerou; não copie
+o texto ilustrativo):
+
+```dotenv
+ADMIN_SESSION_SECRET=COLE_A_CHAVE_GERADA_AQUI
+```
+
+Substitua `COLE_A_CHAVE_GERADA_AQUI` pela chave real, salve o arquivo
+(`Ctrl+S` no VS Code ou Bloco de Notas) e feche o editor.
+
+**Importante:** não envie a chave pelo chat, não a publique no GitHub e
+não a reutilize em outra instalação. Se gerar uma chave nova para uma
+instalação já em uso, as sessões administrativas existentes poderão ser
+invalidadas.
 
   -----------------------------------------------------------------------
   Variável                            O que significa
@@ -800,21 +833,21 @@ git pull
 -   `pull`: busca e integra as alterações publicadas no repositório
     remoto.
 
-Depois, reconstrua e inicie os serviços:
+Depois, reconstrua e inicie os serviços.
 
-``` bash
+Depois, reconstrua e inicie os serviços. Se você configurou HTTPS, o
+serviço Caddy também será iniciado porque foi adicionado ao mesmo arquivo
+`docker-compose.yml`.
+
+```bash
 sudo docker compose up -d --build
-```
-
-Por fim, confira:
-
-``` bash
 sudo docker compose ps
 ```
 
 **Importante:** não apague volumes para atualizar o código. Os volumes
-podem guardar os produtos, pedidos e alterações de estoque do
-laboratório.
+podem guardar os produtos, pedidos e alterações de estoque do laboratório.
+O `Caddyfile` é criado somente na etapa opcional de HTTPS; ele não é
+necessário para o laboratório local.
 
 ------------------------------------------------------------------------
 
@@ -971,31 +1004,44 @@ Se continuar sem funcionar, confira também o IPv4 público, a conectividade de 
 
 ------------------------------------------------------------------------
 
-## 12. Configurar domínio e HTTPS
+## 12. Configurar domínio e HTTPS (etapa opcional)
 
-Esta etapa é opcional. Ela publica a loja por um domínio e habilita HTTPS
-usando o DuckDNS para apontar o domínio para o IP público da EC2 e o Caddy
-como proxy reverso. Faça esta etapa somente depois de confirmar que a loja
-funciona pela porta 3000.
+**Só faça esta seção se a loja já estiver funcionando na EC2 pelo endereço
+`http://IP_PUBLICO_DA_EC2:3000`.** Se você não quiser configurar domínio e
+HTTPS agora, pode pular toda esta seção. A aplicação local e a publicação
+básica na EC2 não precisam do Caddy.
 
-> **Importante:** o domínio `lojatech.duckdns.org` é apenas um exemplo.
-> Crie um domínio próprio na sua conta DuckDNS e use exatamente esse nome
-> tanto no `Caddyfile` quanto no navegador. Não presuma que o nome de exemplo
-> esteja disponível.
+Nesta etapa, vamos usar:
+
+- **DuckDNS:** fornece um subdomínio gratuito para o laboratório.
+- **Caddy:** recebe as conexões HTTP/HTTPS e encaminha as solicitações para
+  a aplicação.
+- **`Caddyfile`:** arquivo que informa ao Caddy qual domínio usar e para onde
+  encaminhar as solicitações.
+
+**Importante:** não vamos colocar o Caddy no `docker-compose.yml` principal.
+Assim, quem estiver fazendo apenas o laboratório local não terá erro por
+causa de um `Caddyfile` que ainda não existe. O arquivo `Caddyfile` é criado
+na EC2 nesta etapa e não deve ser enviado ao GitHub.
 
 ### Passo 1 — Criar e configurar o domínio
 
 1. Acesse [DuckDNS](https://www.duckdns.org/) e entre na sua conta.
 2. Crie ou selecione um subdomínio disponível.
-3. Configure-o para apontar para o IPv4 público atual da sua EC2.
+3. Configure o subdomínio para apontar para o IPv4 público atual da EC2.
 4. Confirme que o domínio resolve para o IP da instância antes de continuar.
+
+O domínio `lojatech.duckdns.org` é apenas um exemplo. Use o seu próprio
+subdomínio nos passos seguintes. Não presuma que o nome de exemplo esteja
+disponível.
 
 O IP público pode mudar quando a EC2 é parada e iniciada novamente, caso
 você não utilize um Elastic IP. Se isso acontecer, atualize o registro DNS.
 
-### Passo 2 — Ajustar o Security Group
+### Passo 2 — Ajustar as regras do Security Group
 
-No grupo de segurança da EC2, mantenha estas regras de entrada:
+No console da AWS, abra a instância EC2, selecione o Security Group associado
+e configure estas regras de entrada:
 
 | Tipo | Protocolo | Porta | Origem |
 |---|---|---:|---|
@@ -1003,14 +1049,15 @@ No grupo de segurança da EC2, mantenha estas regras de entrada:
 | HTTP | TCP | 80 | `0.0.0.0/0` |
 | HTTPS | TCP | 443 | `0.0.0.0/0` |
 
-Não abra a porta `5432` do PostgreSQL. Depois de confirmar que HTTPS
-funciona, remova a regra TCP 3000 criada para o teste inicial.
+Não abra a porta `5432` do PostgreSQL. Depois de confirmar que o HTTPS
+funciona, removeremos a regra TCP 3000 criada para o teste inicial.
 
-### Passo 3 — Configurar a aplicação para uso atrás do Caddy
+### Passo 3 — Configurar a porta da aplicação na EC2
 
-Dentro da sessão SSH da EC2, na pasta `lojatech`, edite o arquivo `.env`:
+Na sessão SSH da EC2, entre na pasta do projeto e abra o `.env`:
 
 ```bash
+cd ~/lojatech
 nano .env
 ```
 
@@ -1021,46 +1068,76 @@ APP_BIND_IP=127.0.0.1
 APP_HOST_PORT=3000
 ```
 
-Salve com `Ctrl+O`, pressione `Enter` e saia com `Ctrl+X`. Essa configuração
-limita a publicação da porta 3000 ao próprio host EC2. O Caddy encaminhará
-as solicitações para o serviço `app` pela rede interna do Docker Compose.
+Isso limita a porta 3000 ao próprio sistema operacional da EC2. O Caddy
+encaminhará as solicitações para `app:3000` pela rede interna do Docker.
+A porta 3000 não precisará ficar acessível diretamente pela internet após
+o HTTPS funcionar.
 
-### Passo 4 — Criar o arquivo Caddyfile
+Para salvar no `nano`, pressione `Ctrl+O`, depois `Enter` e, por fim,
+`Ctrl+X`.
 
-Na pasta `lojatech`, crie ou edite `Caddyfile`:
+### Passo 4 — Criar o arquivo `Caddyfile`
+
+Ainda na pasta `~/lojatech`, execute:
 
 ```bash
 nano Caddyfile
 ```
 
-Use o seu domínio real no lugar de `lojatech.duckdns.org`:
+Esse comando abre o editor. Se o arquivo ainda não existir, ele será criado
+quando você salvar.
+
+Cole o conteúdo abaixo, substituindo `SEU_SUBDOMINIO.duckdns.org` pelo
+domínio que você criou no DuckDNS:
 
 ```caddyfile
-lojatech.duckdns.org {
+SEU_SUBDOMINIO.duckdns.org {
     encode zstd gzip
     reverse_proxy app:3000
 }
 ```
 
-- O nome na primeira linha é o domínio que os visitantes vão acessar.
-- `encode zstd gzip` habilita compressão compatível com o cliente.
-- `reverse_proxy app:3000` encaminha as solicitações ao serviço da aplicação
-  dentro da rede Docker.
+**Não deixe o texto `SEU_SUBDOMINIO.duckdns.org` no arquivo.** Troque-o pelo
+seu domínio real. Por exemplo, se seu domínio for `minhaloja.duckdns.org`,
+a primeira linha deve ser `minhaloja.duckdns.org {`.
 
-Salve o arquivo e saia do editor.
+Para salvar, pressione `Ctrl+O`, depois `Enter` e, por fim, `Ctrl+X`.
 
-### Passo 5 — Adicionar o serviço Caddy ao Docker Compose
+O `Caddyfile` é uma configuração local da EC2 nesta etapa opcional. Não
+o adicione ao GitHub.
 
-Abra `docker-compose.yml`:
+### Passo 5 — Adicionar o Caddy ao arquivo `docker-compose.yml`
+
+Nesta etapa, vamos usar **somente o arquivo `docker-compose.yml`**. Não crie
+um segundo arquivo Compose.
+
+Abra o arquivo principal na EC2:
 
 ```bash
 nano docker-compose.yml
 ```
 
-Dentro de `services:`, adicione o bloco `caddy` abaixo no mesmo nível de
-indentação dos serviços `app` e `db`. Não o coloque dentro do bloco `app`:
+Dentro dele, já existem os serviços `db` e `app`. Procure o começo do arquivo,
+onde aparece `services:`, e localize o final da configuração do serviço `app`.
+O serviço `app` termina antes da seção `networks:`.
+
+**Cole o bloco do Caddy dentro de `services:`, no mesmo nível de `db:` e
+`app:`.** Isso significa que `caddy:`, `db:` e `app:` devem começar alinhados
+na mesma coluna. Não cole o bloco dentro de `app:` e não o coloque depois de
+`networks:`.
+
+O trecho abaixo ilustra como a estrutura deve ficar. Os comentários
+representam configurações que já existem no arquivo; **não apague nem
+substitua as configurações reais de `db` e `app` por estes comentários**.
 
 ```yaml
+services:
+  db:
+    # mantenha aqui toda a configuração existente do banco
+
+  app:
+    # mantenha aqui toda a configuração existente da aplicação
+
   caddy:
     image: caddy:2
     restart: unless-stopped
@@ -1074,44 +1151,60 @@ indentação dos serviços `app` e `db`. Não o coloque dentro do bloco `app`:
       - caddy_config:/config
     depends_on:
       - app
+    networks:
+      - appnet
     security_opt:
       - no-new-privileges:true
-```
 
-No final do arquivo, na seção de volumes de nível superior, mantenha o
-volume do banco que já existe e acrescente os volumes do Caddy. A estrutura
-será semelhante a esta (preserve quaisquer outros volumes já declarados):
+networks:
+  appnet:
+    driver: bridge
 
-```yaml
 volumes:
   postgres_data:
   caddy_data:
   caddy_config:
 ```
 
-**Atenção:** se o volume do PostgreSQL no seu `docker-compose.yml` tiver
-outro nome, mantenha o nome que já está no arquivo. Não substitua nem remova
-o volume existente, pois ele pode conter os dados da loja. O Caddy e o
-serviço `app` precisam estar na mesma rede Docker; com a rede padrão do
-Compose isso acontece automaticamente.
+#### Atenção: preserve o final do arquivo
 
-Salve o arquivo e saia do editor.
+No seu `docker-compose.yml`, a seção `networks:` já existe. Não crie uma
+segunda seção `networks:`. Mantenha a existente.
 
-### Passo 6 — Validar e iniciar
+No final do arquivo, procure a seção `volumes:`. Ela já declara
+`postgres_data:`. Acrescente `caddy_data:` e `caddy_config:` nessa mesma
+seção, um abaixo do outro, como no exemplo acima. Não remova `postgres_data:`,
+pois ele pode guardar os dados do banco.
 
-Antes de iniciar, valide a sintaxe do Compose:
+Em resumo, faça apenas estas duas alterações no arquivo existente:
+
+1. Adicione o bloco completo `caddy:` dentro de `services:`, depois da
+   configuração de `app` e antes de `networks:`.
+2. Na seção `volumes:` que já existe no final, mantenha `postgres_data:` e
+   acrescente `caddy_data:` e `caddy_config:`.
+
+Para salvar no `nano`, pressione `Ctrl+O`, depois `Enter` e, por fim,
+`Ctrl+X`.
+
+O arquivo `Caddyfile` deve estar na mesma pasta do `docker-compose.yml`.
+Ele foi criado no passo anterior e não deve ser enviado ao GitHub.
+
+### Passo 6 — Validar e iniciar a configuração
+
+Antes de iniciar os serviços, valide o arquivo:
 
 ```bash
 sudo docker compose config -q
 ```
 
-Se o comando terminar sem erro, recrie os serviços:
+Esse comando verifica se o `docker-compose.yml` está escrito corretamente.
+Se terminar sem erro, inicie a aplicação e o Caddy:
 
 ```bash
 sudo docker compose up -d --build
 ```
 
-Confira o estado dos serviços:
+Confira se os serviços estão funcionando:
 
 ```bash
 sudo docker compose ps
@@ -1123,33 +1216,37 @@ Valide a configuração do Caddy:
 sudo docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile
 ```
 
-Consulte os logs se necessário:
+Para consultar os logs do Caddy:
 
 ```bash
 sudo docker compose logs --tail=100 caddy
 ```
 
 O Caddy poderá solicitar e renovar automaticamente o certificado TLS
-quando o domínio estiver apontando para a EC2 e as portas 80 e 443 estiverem
-acessíveis. A emissão do certificado não é garantida até que DNS e regras
-de rede estejam corretos.
+quando o domínio apontar para a EC2 e as portas 80 e 443 estiverem acessíveis.
+A emissão do certificado não é garantida até que DNS e regras de rede estejam
+corretos.
 
 ### Passo 7 — Testar HTTPS e fechar a porta 3000
 
-Abra no navegador o domínio que você configurou, por exemplo:
+No navegador do seu computador, abra o domínio real que você configurou:
 
-`https://lojatech.duckdns.org`
-
-Confirme que a página carrega e que o navegador mostra um certificado válido
-para o domínio utilizado. Também é possível testar os cabeçalhos:
-
-```bash
-curl -I https://lojatech.duckdns.org
+```text
+https://SEU_SUBDOMINIO.duckdns.org
 ```
 
-Substitua o domínio de exemplo pelo seu. Depois de confirmar que HTTPS
-funciona, remova a regra TCP 3000 do Security Group. Mantenha SSH restrito
-ao seu IP e as portas 80 e 443 liberadas para o acesso público.
+Substitua `SEU_SUBDOMINIO.duckdns.org` pelo seu domínio. Confirme que a
+página carrega e que o navegador mostra um certificado válido.
+
+Você também pode testar pelo terminal SSH da EC2:
+
+```bash
+curl -I https://SEU_SUBDOMINIO.duckdns.org
+```
+
+Depois de confirmar que o HTTPS funciona, remova a regra TCP 3000 do
+Security Group. Mantenha SSH restrito ao seu IP e as portas 80 e 443
+liberadas para o acesso público.
 
 ### Problemas comuns com HTTPS
 
@@ -1158,10 +1255,10 @@ ao seu IP e as portas 80 e 443 liberadas para o acesso público.
   Security Group e os logs do Caddy.
 - **O certificado não é emitido:** confirme o domínio e o acesso externo às
   portas 80 e 443.
-- **O proxy não encontra a aplicação:** confira se o serviço se chama `app`
-  e se está na mesma rede Docker que o Caddy.
+- **O proxy não encontra a aplicação:** confira se `app` e `caddy` estão na
+  mesma rede Docker. O bloco do Caddy deve conectar o serviço à rede `appnet`.
 
-Comandos úteis para diagnóstico:
+Use estes comandos de diagnóstico:
 
 ```bash
 sudo docker compose ps
@@ -1171,20 +1268,28 @@ sudo docker compose logs --tail=100 app
 
 Não compartilhe `.env`, senhas, tokens do DuckDNS ou chaves privadas.
 
-------------------------------------------------------------------------
-
 ## 13. Encerrar o laboratório e evitar custos
 
 ### Passo 1 --- Parar os contêineres
 
-Dentro da EC2, na pasta `lojatech`, execute:
+Dentro da EC2, na pasta `lojatech`, escolha o comando conforme a configuração usada.
 
-``` bash
+Se você **não configurou HTTPS**, execute:
+
+```bash
 sudo docker compose down
 ```
 
--   `down`: para e remove os contêineres e a rede criados pelo Compose.
--   Esse comando não encerra a instância EC2.
+Se você **configurou HTTPS na seção 12**, execute com os dois arquivos:
+
+```bash
+sudo docker compose down
+```
+
+`down` para e remove os contêineres e a rede criados pelo Compose. Esse
+comando não encerra a instância EC2 e não remove os volumes nomeados do banco
+ou do Caddy, a menos que você acrescente a opção `-v`. Não use `-v` se quiser
+preservar os dados.
 
 ### Passo 2 --- Encerrar a instância
 
@@ -1227,9 +1332,9 @@ LojaTech/
 ├── .gitignore
 ├── Dockerfile
 ├── docker-compose.yml
-├── Caddyfile
 ├── package.json
-└── README.md
+├── README.md
+└── Caddyfile                 (criado somente se configurar HTTPS)
 ```
 
   -----------------------------------------------------------------------
@@ -1277,7 +1382,9 @@ LojaTech/
 
 
 O arquivo `.env` é criado durante a configuração e não deve ser enviado
-ao GitHub.
+ao GitHub. O `Caddyfile` é criado manualmente na EC2 apenas se você fizer a etapa
+opcional de HTTPS.
+Eles não são necessários para baixar e executar a aplicação localmente.
 
 ## Referências oficiais
 
