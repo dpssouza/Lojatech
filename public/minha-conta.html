@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Área do cliente LojaTech: pedidos, dados pessoais, endereços e segurança da conta.">
+  <title>Minha conta | LojaTech</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/minha-conta.js" defer></script>
+</head>
+<body class="customer-page-body">
+  <header class="account-store-header">
+    <a class="brand account-store-brand" href="/" aria-label="LojaTech página inicial"><span class="brand-mark">L</span> LojaTech</a>
+    <form class="account-store-search" action="/#produtos" method="get" role="search">
+      <span class="account-search-icon" aria-hidden="true">⌕</span>
+      <input type="search" name="q" placeholder="Buscar produtos..." aria-label="Buscar produtos">
+      <select aria-label="Categoria" name="categoria"><option value="">Todas as categorias</option><option>Informática</option><option>Periféricos</option><option>Armazenamento</option></select>
+      <button type="submit" aria-label="Buscar">⌕</button>
+    </form>
+    <nav class="account-store-nav" aria-label="Navegação da loja">
+      <a href="/">⌂ <span>Início</span></a>
+      <a href="/#produtos">▦ <span>Categorias</span></a>
+      <a href="/?abrirCarrinho=1">🛒 <span>Carrinho</span><b>0</b></a>
+    </nav>
+    <a class="account-store-user" href="/minha-conta.html" aria-current="page"><span class="account-store-user-icon">♙</span><span><strong>Minha conta</strong><small id="account-page-email">Carregando sua conta...</small></span><span class="account-store-chevron">⌄</span></a>
+  </header>
+  <main class="customer-page-main account-settings-main">
+    <section class="account-summary-grid" aria-label="Resumo da conta">
+      <article class="account-summary-card"><span class="account-summary-icon">▤</span><div><span class="account-summary-label">Total de pedidos</span><strong id="account-stat-orders">—</strong></div></article>
+      <article class="account-summary-card"><span class="account-summary-icon">◷</span><div><span class="account-summary-label">Em andamento</span><strong id="account-stat-active">—</strong></div></article>
+      <article class="account-summary-card"><span class="account-summary-icon">R$</span><div><span class="account-summary-label">Total comprado</span><strong id="account-stat-spent">—</strong></div></article>
+      <article class="account-summary-card"><span class="account-summary-icon">⌖</span><div><span class="account-summary-label">Endereços salvos</span><strong id="account-stat-addresses">—</strong></div></article>
+    </section>
+    <div class="account-layout">
+      <nav class="account-side-nav" aria-label="Menu da conta">
+        <p class="account-side-title">ÁREA DO CLIENTE</p>
+        <button type="button" class="account-nav-item active" data-account-tab="overview"><span>⌂</span> Visão geral</button>
+        <button type="button" class="account-nav-item" data-account-tab="orders"><span>▤</span> Meus pedidos</button>
+        <button type="button" class="account-nav-item" data-account-tab="profile"><span>♙</span> Dados pessoais</button>
+        <button type="button" class="account-nav-item" data-account-tab="addresses"><span>⌖</span> Meus endereços</button>
+        <button type="button" class="account-nav-item" data-account-tab="security"><span>♧</span> Segurança da conta</button>
+      </nav>
+      <div class="account-content-panel">
+        <section id="account-page-overview" class="customer-page-section">
+          <div class="dashboard-section-heading"><div><h2>Olá, <span id="account-overview-name">cliente</span>!</h2><p class="dashboard-muted">Aqui você acompanha sua conta e suas compras recentes.</p></div><button id="account-overview-refresh" class="text-button" type="button">Atualizar</button></div>
+          <div class="account-overview-grid">
+            <section class="account-overview-card account-overview-orders-card">
+              <div class="dashboard-section-heading account-recent-heading"><div><h3>Pedidos recentes</h3><p class="dashboard-muted">Acompanhe suas últimas compras.</p></div><button type="button" class="text-button" data-open-tab="orders">Ver todos →</button></div>
+              <p id="account-overview-message" class="dashboard-muted" role="status">Carregando...</p>
+              <div id="account-overview-orders" class="dashboard-orders-list"></div>
+            </section>
+            <div class="account-overview-sidecards">
+              <section class="account-overview-card account-quick-profile">
+                <div class="account-mini-card-heading"><h3>Meus dados</h3><button type="button" class="text-button" data-open-tab="profile">Editar</button></div>
+                <dl class="account-quick-details"><div><dt>Nome completo</dt><dd id="account-preview-name">—</dd></div><div><dt>Telefone</dt><dd id="account-preview-phone">—</dd></div><div><dt>E-mail</dt><dd id="account-preview-email">—</dd></div></dl>
+              </section>
+              <section class="account-overview-card account-quick-address">
+                <div class="account-mini-card-heading"><h3>Meu endereço principal</h3><button type="button" class="text-button" data-open-tab="addresses">Gerenciar</button></div>
+                <p id="account-preview-address" class="account-preview-address">Carregando endereços...</p>
+              </section>
+            </div>
+          </div>
+        </section>
+        <section id="account-page-orders" class="customer-page-section" hidden>
+          <div class="dashboard-section-heading"><div><h2>Meus pedidos</h2><p class="dashboard-muted">Acompanhe suas compras e veja os produtos de cada pedido.</p></div><button id="account-page-refresh" class="text-button" type="button">Atualizar</button></div>
+          <p id="account-page-orders-message" class="dashboard-muted" role="status">Carregando seus pedidos...</p>
+          <div id="account-page-orders-list" class="dashboard-orders-list"></div>
+        </section>
+        <section id="account-page-profile" class="customer-page-section" hidden>
+          <div class="customer-profile-card"><h2>Dados pessoais</h2><p class="dashboard-muted">Mantenha seus dados de contato atualizados.</p>
+            <form id="account-page-profile-form" class="dashboard-profile-form">
+              <label for="account-page-full-name">Nome completo</label><input id="account-page-full-name" autocomplete="name" required minlength="2" maxlength="120">
+              <label for="account-page-phone">Telefone</label><input id="account-page-phone" type="tel" autocomplete="tel" maxlength="30">
+              <label for="account-page-email-field">E-mail da conta</label><input id="account-page-email-field" type="email" disabled>
+              <button class="primary-button" type="submit">Salvar alterações</button><p id="account-page-profile-message" role="status"></p>
+            </form>
+          </div>
+        </section>
+        <section id="account-page-addresses" class="customer-page-section" hidden>
+          <div class="dashboard-section-heading"><div><h2>Meus endereços</h2><p class="dashboard-muted">Cadastre os endereços que você usa para receber suas compras.</p></div><button id="account-address-new" class="primary-button account-small-primary" type="button">Adicionar endereço</button></div>
+          <p id="account-address-message" class="dashboard-muted" role="status"></p>
+          <div id="account-address-list" class="account-address-list"></div>
+          <form id="account-address-form" class="account-address-form" hidden>
+            <h3 id="account-address-form-title">Novo endereço</h3>
+            <input id="account-address-id" type="hidden">
+            <div class="account-address-fields">
+              <label>Nome de quem recebe<input id="address-recipient" required maxlength="120" autocomplete="name"></label>
+              <label>CEP<input id="address-postal" required maxlength="12" autocomplete="postal-code" placeholder="00000-000"></label>
+              <label class="address-field-wide">Rua / logradouro<input id="address-street" required maxlength="180" autocomplete="address-line1"></label>
+              <label>Número<input id="address-number" required maxlength="30"></label>
+              <label>Complemento (opcional)<input id="address-complement" maxlength="120" autocomplete="address-line2"></label>
+              <label>Bairro<input id="address-neighborhood" required maxlength="120"></label>
+              <label>Cidade<input id="address-city" required maxlength="120" autocomplete="address-level2"></label>
+              <label>Estado (UF)<input id="address-state" required maxlength="2" minlength="2" autocomplete="address-level1" placeholder="BA"></label>
+            </div>
+            <label class="account-default-check"><input id="address-default" type="checkbox"> Definir como endereço padrão</label>
+            <div class="account-form-actions"><button class="primary-button" type="submit">Salvar endereço</button><button id="account-address-cancel" class="account-back-link" type="button">Cancelar</button></div>
+            <p id="account-address-form-message" role="status"></p>
+          </form>
+        </section>
+        <section id="account-page-security" class="customer-page-section" hidden>
+          <div class="customer-profile-card"><h2>Segurança da conta</h2><p class="dashboard-muted">Atualize o e-mail de acesso e mantenha uma senha exclusiva.</p>
+            <form id="account-email-form" class="dashboard-profile-form">
+              <h3>Alterar e-mail</h3>
+              <label for="account-current-email-password">Senha atual</label><input id="account-current-email-password" type="password" required maxlength="128" autocomplete="current-password">
+              <label for="account-new-email">Novo e-mail</label><input id="account-new-email" type="email" required maxlength="180" autocomplete="email">
+              <button class="primary-button" type="submit">Alterar e-mail</button><p id="account-email-message" role="status"></p>
+            </form>
+            <hr>
+            <form id="account-password-form" class="dashboard-profile-form">
+              <label for="account-current-password">Senha atual</label><input id="account-current-password" type="password" required autocomplete="current-password" maxlength="128">
+              <label for="account-new-password">Nova senha</label><input id="account-new-password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"><small>Use pelo menos 8 caracteres.</small>
+              <label for="account-confirm-password">Confirmar nova senha</label><input id="account-confirm-password" type="password" required minlength="8" maxlength="128" autocomplete="new-password">
+              <button class="primary-button" type="submit">Alterar senha</button><p id="account-password-message" role="status"></p>
+            </form>
+          </div>
+          <div class="account-security-note"><strong>Proteção da conta</strong><p>Não compartilhe sua senha. Se você suspeitar que outra pessoa conhece sua senha, altere-a assim que possível.</p></div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <footer><span>LojaTech — projeto educacional</span><span>Node.js · PostgreSQL · Docker</span></footer>
+</body>
+</html>

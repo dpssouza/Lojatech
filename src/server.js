@@ -5,6 +5,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { Pool } = require('pg');
+const session = require('express-session');
+const PgSession = require('connect-pg-simple')(session);
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -112,6 +114,16 @@ const orderLimiter = rateLimit({
   message: { error: 'Muitos pedidos enviados. Aguarde antes de tentar novamente.' },
 });
 
+// Lê a mesma sessão de cliente usada em /api/customer-auth, também no checkout.
+const customerSession = session({
+  name: 'lojatech.customer.sid',
+  secret: process.env.CUSTOMER_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET,
+  store: new PgSession({ pool, tableName: 'session', createTableIfMissing: false }),
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 8 * 60 * 60 * 1000, path: '/' },
+});
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -134,7 +146,37 @@ app.get('/api/products', productLimiter, async (_req, res) => {
   }
 });
 
-app.post('/api/orders', orderLimiter, async (req, res) => {
+app.get('/api/customer/orders', customerSession, async (req, res) => {
+  const customerId = Number.isSafeInteger(req.session?.customerId) && req.session.customerId > 0
+    ? req.session.customerId : null;
+  if (!customerId) {
+    return res.status(401).json({ error: 'Faça login para consultar seus pedidos.' });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT o.id, o.total, o.status, o.created_at,
+        COALESCE(json_agg(json_build_object(
+          'productName', p.name,
+          'quantity', oi.quantity,
+          'unitPrice', oi.unit_price
+        )) FILTER (WHERE oi.product_id IS NOT NULL), '[]'::json) AS items
+       FROM orders o
+       LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN products p ON p.id = oi.product_id
+       WHERE o.customer_id = $1
+       GROUP BY o.id
+       ORDER BY o.created_at DESC
+       LIMIT 50`,
+      [customerId]
+    );
+    return res.json({ orders: result.rows });
+  } catch (error) {
+    console.error('Erro ao consultar pedidos do cliente:', error.message);
+    return res.status(500).json({ error: 'Não foi possível carregar seus pedidos.' });
+  }
+});
+
+app.post('/api/orders', orderLimiter, customerSession, async (req, res) => {
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'Corpo da requisição inválido.' });
@@ -143,13 +185,13 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   const customerName = typeof body.customerName === 'string' ? body.customerName.trim() : '';
   const customerEmail = typeof body.customerEmail === 'string' ? body.customerEmail.trim() : '';
   const items = body.items;
+  const signedInCustomerId = Number.isSafeInteger(req.session?.customerId) && req.session.customerId > 0
+    ? req.session.customerId : null;
 
   if (
-    !customerName ||
+    (!signedInCustomerId && (!customerName || !customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail))) ||
     customerName.length > 120 ||
-    !customerEmail ||
     customerEmail.length > 180 ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) ||
     !Array.isArray(items) ||
     items.length === 0 ||
     items.length > 50
@@ -157,6 +199,15 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     return res.status(400).json({
       error: 'Informe nome (até 120 caracteres), e-mail válido (até 180 caracteres) e até 50 itens.',
     });
+  }
+
+  // Pedidos autenticados exigem CSRF válido e usam os dados confiáveis da conta.
+  if (signedInCustomerId) {
+    const suppliedCsrf = req.get('X-CSRF-Token');
+    const expectedCsrf = req.session.csrfToken;
+    if (typeof suppliedCsrf !== 'string' || typeof expectedCsrf !== 'string' || suppliedCsrf !== expectedCsrf) {
+      return res.status(403).json({ error: 'Token de segurança inválido. Atualize a página e tente novamente.' });
+    }
   }
 
   // Agrega IDs repetidos antes de consultar o banco. Sem isso, um mesmo
@@ -189,6 +240,19 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
 
     let totalCents = 0;
     const verifiedItems = [];
+    let linkedCustomer = null;
+    if (signedInCustomerId) {
+      const customerResult = await client.query(
+        `SELECT id, full_name, email FROM public.customers WHERE id = $1 AND status = 'active'`,
+        [signedInCustomerId]
+      );
+      if (!customerResult.rowCount) {
+        const error = new Error('Sua conta não está disponível. Entre novamente.');
+        error.status = 401;
+        throw error;
+      }
+      linkedCustomer = customerResult.rows[0];
+    }
 
     // Ordenar IDs reduz a chance de deadlocks quando pedidos concorrentes
     // contêm os mesmos produtos em ordens diferentes.
@@ -228,8 +292,9 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
 
     const total = (totalCents / 100).toFixed(2);
     const orderResult = await client.query(
-      'INSERT INTO orders (customer_name, customer_email, total) VALUES ($1, $2, $3) RETURNING id, total, created_at',
-      [customerName, customerEmail, total]
+      `INSERT INTO orders (customer_name, customer_email, total, customer_id)
+       VALUES ($1, $2, $3, $4) RETURNING id, total, created_at`,
+      [linkedCustomer ? linkedCustomer.full_name : customerName, linkedCustomer ? linkedCustomer.email : customerEmail, total, linkedCustomer ? linkedCustomer.id : null]
     );
     const order = orderResult.rows[0];
 
@@ -250,6 +315,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       message: 'Pedido registrado com sucesso!',
       orderId: order.id,
       total: Number(order.total),
+      linkedToAccount: Boolean(linkedCustomer),
     });
   } catch (error) {
     if (client && transactionStarted) {
@@ -270,6 +336,10 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     if (client) client.release();
   }
 });
+
+// Autenticação e perfil de clientes. Usa sessão separada do painel administrativo.
+const createCustomerAuthRouter = require('./customer-auth');
+app.use('/api/customer-auth', createCustomerAuthRouter(pool));
 
 // Painel administrativo da LojaTech
 const createAdminRouter = require('./admin');

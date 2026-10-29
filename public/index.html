@@ -12,7 +12,7 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="LojaTech página inicial"><span class="brand-mark">L</span> LojaTech</a>
     <div class="topbar-note">Laboratório de deploy · Node.js + PostgreSQL + Docker</div>
-    <button id="cart-toggle" class="cart-toggle" type="button">Carrinho <span id="cart-count">0</span></button>
+    <div class="topbar-actions"><button id="account-top-toggle" class="account-top-toggle" type="button">Entrar / Criar conta</button><button id="logout-top-button" class="logout-top-button" type="button" hidden>Sair</button><button id="cart-toggle" class="cart-toggle" type="button">Carrinho <span id="cart-count">0</span></button></div>
   </header>
   <main>
     <section class="hero">
@@ -24,11 +24,31 @@
       <div id="product-grid" class="product-grid"></div>
     </section>
   </main>
+  <section id="customer-dashboard" class="customer-dashboard-overlay" hidden aria-modal="true" role="dialog" aria-labelledby="customer-dashboard-title">
+    <div class="customer-dashboard">
+      <div class="dashboard-header"><div><p class="eyebrow">ÁREA DO CLIENTE</p><h2 id="customer-dashboard-title">Minha conta</h2><p id="dashboard-customer-email" class="dashboard-muted"></p></div><button id="dashboard-close" class="icon-button" type="button" aria-label="Fechar painel">×</button></div>
+      <div class="dashboard-tabs"><button type="button" class="dashboard-tab active" data-dashboard-tab="orders">Meus pedidos</button><button type="button" class="dashboard-tab" data-dashboard-tab="profile">Meus dados</button></div>
+      <section id="dashboard-orders-section" class="dashboard-section"><div class="dashboard-section-heading"><h3>Histórico de pedidos</h3><button id="dashboard-refresh-orders" class="text-button" type="button">Atualizar</button></div><p id="dashboard-orders-message" class="dashboard-muted" role="status">Carregando seus pedidos...</p><div id="dashboard-orders-list" class="dashboard-orders-list"></div></section>
+      <section id="dashboard-profile-section" class="dashboard-section" hidden><h3>Dados pessoais</h3><form id="dashboard-profile-form" class="dashboard-profile-form"><label for="dashboard-full-name">Nome completo</label><input id="dashboard-full-name" required minlength="2" maxlength="120"><label for="dashboard-phone">Telefone</label><input id="dashboard-phone" type="tel" maxlength="30"><button class="primary-button" type="submit">Salvar alterações</button><p id="dashboard-profile-message" role="status"></p></form></section>
+      <div class="dashboard-footer"><button id="dashboard-logout" class="secondary-button" type="button">Sair da conta</button></div>
+    </div>
+  </section>
   <aside id="cart-panel" class="cart-panel" aria-label="Carrinho de compras" hidden>
     <div class="cart-heading"><h2>Seu carrinho</h2><button id="cart-close" class="icon-button" type="button" aria-label="Fechar carrinho">×</button></div>
     <div id="cart-items" class="cart-items"></div>
     <div class="cart-total"><span>Total</span><strong id="cart-total">R$ 0,00</strong></div>
-    <form id="checkout-form" class="checkout-form"><label for="customer-name">Nome</label><input id="customer-name" name="customerName" required maxlength="120" placeholder="Seu nome"><label for="customer-email">E-mail</label><input id="customer-email" name="customerEmail" type="email" required maxlength="180" placeholder="voce@exemplo.com"><button class="primary-button" type="submit">Finalizar pedido</button><p id="checkout-message" role="status"></p></form>
+    <section class="checkout-account" aria-label="Opção de compra com conta">
+      <p class="checkout-account-title">Como deseja comprar?</p>
+      <button id="account-checkout-toggle" class="secondary-button" type="button">Entrar ou criar conta para comprar</button>
+      <div id="checkout-account-panel" class="account-panel" hidden>
+        <div class="account-tabs"><button type="button" id="show-login" class="account-tab active">Entrar</button><button type="button" id="show-register" class="account-tab">Criar conta</button></div>
+        <form id="checkout-login-form" class="account-form"><label for="checkout-login-email">E-mail</label><input id="checkout-login-email" type="email" autocomplete="email" required maxlength="180"><label for="checkout-login-password">Senha</label><input id="checkout-login-password" type="password" autocomplete="current-password" required maxlength="128"><button class="primary-button" type="submit">Entrar e continuar</button></form>
+        <form id="checkout-register-form" class="account-form" hidden><label for="checkout-register-name">Nome completo</label><input id="checkout-register-name" autocomplete="name" required minlength="2" maxlength="120"><label for="checkout-register-email">E-mail</label><input id="checkout-register-email" type="email" autocomplete="email" required maxlength="180"><label for="checkout-register-phone">Telefone (opcional)</label><input id="checkout-register-phone" type="tel" autocomplete="tel" maxlength="30"><label for="checkout-register-password">Criar senha (mínimo de 8 caracteres)</label><input id="checkout-register-password" type="password" autocomplete="new-password" required minlength="8" maxlength="128"><button class="primary-button" type="submit">Criar conta e continuar</button></form>
+        <p id="account-checkout-message" role="status"></p>
+      </div>
+      <p id="checkout-account-status" class="account-status" hidden></p>
+    </section>
+    <form id="checkout-form" class="checkout-form"><div id="guest-checkout-fields"><p class="guest-note">Ou finalize como visitante, sem criar conta.</p><label for="customer-name">Nome</label><input id="customer-name" name="customerName" required maxlength="120" placeholder="Seu nome"><label for="customer-email">E-mail</label><input id="customer-email" name="customerEmail" type="email" required maxlength="180" placeholder="voce@exemplo.com"></div><button class="primary-button" type="submit">Finalizar pedido</button><p id="checkout-message" role="status"></p></form>
   </aside>
   <footer><span>LojaTech — projeto educacional</span><span>Node.js · Express · PostgreSQL · Docker</span></footer>
 </body>
