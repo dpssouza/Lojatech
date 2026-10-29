@@ -12,6 +12,11 @@ const addButton = document.querySelector('#detail-add');
 const message = document.querySelector('#detail-message');
 const relatedSection = document.querySelector('#related-section');
 const relatedProductsEl = document.querySelector('#related-products');
+const cartToggle = document.querySelector('#product-cart-toggle');
+const cartPanel = document.querySelector('#detail-cart-panel');
+const cartItemsEl = document.querySelector('#detail-cart-items');
+const cartTotalEl = document.querySelector('#detail-cart-total');
+const cartClose = document.querySelector('#detail-cart-close');
 let product;
 let allProducts = [];
 
@@ -170,5 +175,53 @@ addButton.addEventListener('click', () => {
   message.textContent = 'Produto adicionado ao carrinho!';
   addButton.textContent = 'Adicionado ✓';
   window.setTimeout(() => { addButton.textContent = 'Adicionar ao carrinho'; }, 1600);
+});
+function renderDetailCart() {
+  const cart = readCart();
+  const entries = [...cart.entries()];
+
+  const total = entries.reduce((sum, [id, quantity]) => {
+    const item = allProducts.find(product => Number(product.id) === id);
+    return sum + (item ? Number(item.price) * quantity : 0);
+  }, 0);
+
+  cartItemsEl.innerHTML = entries.length
+    ? entries.map(([id, quantity]) => {
+        const item = allProducts.find(product => Number(product.id) === id);
+        if (!item) return '';
+
+        return `
+          <div class="detail-cart-item">
+            <div>
+              <strong>${escapeHtml(item.name)}</strong>
+              <p>${quantity} × ${money(item.price)}</p>
+            </div>
+            <button type="button" data-detail-remove="${id}">Remover</button>
+          </div>`;
+      }).join('')
+    : '<p>Seu carrinho está vazio.</p>';
+
+  cartTotalEl.textContent = money(total);
+
+  cartItemsEl.querySelectorAll('[data-detail-remove]').forEach(button => {
+    button.addEventListener('click', () => {
+      const updatedCart = readCart();
+      updatedCart.delete(Number(button.dataset.detailRemove));
+      localStorage.setItem(
+        'lojatech-cart',
+        JSON.stringify([...updatedCart.entries()])
+      );
+      renderDetailCart();
+    });
+  });
+}
+
+cartToggle.addEventListener('click', () => {
+  renderDetailCart();
+  cartPanel.hidden = false;
+});
+
+cartClose.addEventListener('click', () => {
+  cartPanel.hidden = true;
 });
 loadProduct();

@@ -13,7 +13,7 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="LojaTech página inicial"><span class="brand-mark">L</span> LojaTech</a>
     <div class="topbar-note">Tecnologia para o dia a dia</div>
-    <a class="cart-toggle product-cart-link" href="/?abrirCarrinho=1">Ver carrinho</a>
+    <button id="product-cart-toggle" class="cart-toggle product-cart-link" type="button">Ver carrinho</button>
   </header>
 
   <main class="product-detail-main">
@@ -58,7 +58,21 @@
       <div id="related-products" class="related-products"></div>
     </section>
   </main>
+  <aside id="detail-cart-panel" class="detail-cart-panel" hidden>
+    <div class="detail-cart-heading">
+      <h2>Seu carrinho</h2>
+      <button id="detail-cart-close" type="button" aria-label="Fechar carrinho">×</button>
+    </div>
 
+    <div id="detail-cart-items"></div>
+
+    <div class="detail-cart-total">
+      <span>Total</span>
+      <strong id="detail-cart-total">R$ 0,00</strong>
+    </div>
+
+    <a class="primary-button detail-cart-return" href="/#produtos">Continuar comprando</a>
+  </aside>
   <footer><span>LojaTech — projeto educacional</span><span>Node.js · PostgreSQL · Docker</span></footer>
 </body>
 </html>

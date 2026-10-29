@@ -7,15 +7,50 @@ const cartCount = document.querySelector('#cart-count');
 const cartTotal = document.querySelector('#cart-total');
 const checkoutMessage = document.querySelector('#checkout-message');
 let products = [];
-const cart = new Map();
+function readCart() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem('lojatech-cart') || '[]'
+    );
+
+    return new Map(
+      Array.isArray(saved)
+        ? saved
+            .filter(item =>
+              Array.isArray(item) &&
+              item.length === 2 &&
+              Number.isInteger(Number(item[0])) &&
+              Number.isInteger(Number(item[1])) &&
+              Number(item[1]) > 0
+            )
+            .map(([id, quantity]) => [
+              Number(id),
+              Number(quantity)
+            ])
+        : []
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+const cart = readCart();
+
+function saveCart() {
+  localStorage.setItem(
+    'lojatech-cart',
+    JSON.stringify([...cart.entries()])
+  );
+}
 
 async function loadProducts() {
   try {
     const response = await fetch('/api/products');
     if (!response.ok) throw new Error('Falha ao consultar a API');
-    products = await response.json();
-    renderProducts();
-    status.textContent = `${products.length} produtos disponíveis`;
+  products = await response.json();
+  renderProducts();
+  renderCart();
+status.textContent = `${products.length} produtos disponíveis`;
   } catch (error) {
     status.textContent = 'Não foi possível carregar os produtos.';
     grid.innerHTML = '<p>Verifique se a aplicação e o banco de dados estão em execução.</p>';
@@ -81,6 +116,7 @@ function addToCart(id) {
   const current = cart.get(id) || 0;
   if (current >= Number(product.stock)) return;
   cart.set(id, current + 1);
+  saveCart();
   renderCart();
 }
 
@@ -97,11 +133,22 @@ function renderCart() {
     const product = products.find(item => Number(item.id) === id);
     return product ? `<div class="cart-line"><div><strong>${escapeHtml(product.name)}</strong><br>${quantity} × ${money(product.price)}</div><button type="button" data-remove="${id}">Remover</button></div>` : '';
   }).join('') : '<p class="empty-cart">Seu carrinho está vazio. Adicione algum produto para continuar.</p>';
-  cartItemsEl.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', () => { cart.delete(Number(button.dataset.remove)); renderCart(); }));
+  cartItemsEl.querySelectorAll('[data-remove]').forEach(button =>
+  button.addEventListener('click', () => {
+    cart.delete(Number(button.dataset.remove));
+    saveCart();
+    renderCart();
+  })
+);
 }
 
 document.querySelector('#cart-toggle').addEventListener('click', () => { panel.hidden = false; });
 document.querySelector('#cart-close').addEventListener('click', () => { panel.hidden = true; });
+const params = new URLSearchParams(window.location.search);
+
+if (params.get('abrirCarrinho') === '1') {
+  panel.hidden = false;
+}
 document.querySelector('#checkout-form').addEventListener('submit', async event => {
   event.preventDefault();
   const checkoutForm = event.currentTarget;
@@ -120,6 +167,7 @@ document.querySelector('#checkout-form').addEventListener('submit', async event 
     if (!response.ok) throw new Error(result.error || 'Não foi possível concluir o pedido.');
     checkoutMessage.textContent = `Pedido #${result.orderId} registrado! Total: ${money(result.total)}.`;
     cart.clear();
+    saveCart();
     checkoutForm.reset();
     renderCart();
     await loadProducts();
