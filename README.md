@@ -320,39 +320,24 @@ não a reutilize em outra instalação. Se gerar uma chave nova para uma
 instalação já em uso, as sessões administrativas existentes poderão ser
 invalidadas.
 
-  -----------------------------------------------------------------------
-  Variável                            O que significa
-  ----------------------------------- -----------------------------------
-  `DB_NAME`                           Nome do banco de dados.
+### O que significa cada variável do `.env`
 
-  `DB_ADMIN_USER`                     Nome da conta administrativa usada
-                                      para inicializar o banco.
+| Variável | O que significa |
+|---|---|
+| `DB_NAME` | Nome do banco de dados. |
+| `DB_ADMIN_USER` | Nome da conta administrativa usada para inicializar o banco. |
+| `DB_ADMIN_PASSWORD` | Senha da conta administrativa. |
+| `DB_USER` | Nome da conta restrita que a aplicação usa. |
+| `DB_PASSWORD` | Senha que a aplicação usa para conectar ao banco. |
+| `DB_POOL_MAX` | Número máximo de conexões do conjunto de conexões do backend. |
+| `APP_BIND_IP` | Endereço IP em que a porta da aplicação será publicada. Use `127.0.0.1` no computador local para restringir o acesso ao próprio computador. |
+| `APP_HOST_PORT` | Porta do computador usada para acessar a aplicação. Por padrão, `3000`. |
+| `ADMIN_USERNAME` | Nome de usuário para entrar no painel administrativo. |
+| `ADMIN_PASSWORD` | Senha forte para acessar o painel administrativo. |
+| `ADMIN_SESSION_SECRET` | Chave secreta usada para proteger as sessões administrativas. Gere uma chave aleatória de 64 caracteres hexadecimais. |
+| `DB_POOL_MAX` | Limite de conexões simultâneas do backend com o banco de dados. |
 
-  `DB_ADMIN_PASSWORD`                 Senha dessa conta administrativa.
-
-  `DB_USER`                           Nome da conta restrita que a
-                                      aplicação usa.
-
-  `DB_PASSWORD`                       Senha que a aplicação usa para
-                                      conectar ao banco.
-
-  `DB_POOL_MAX`                       Número máximo de conexões do
-                                      conjunto de conexões do backend.
-
-  `APP_BIND_IP`                       Endereço local em que a porta será
-                                      publicada. Use `127.0.0.1` no computador.
-
-  `APP_HOST_PORT`                     Porta do computador usada para acessar
-                                      a aplicação (por padrão, `3000`).
-
-  `ADMIN_USERNAME`                    Nome de usuário para entrar no painel
-                                      administrativo.
-
-  `ADMIN_PASSWORD`                    Senha forte para o painel administrativo.
-
-  `ADMIN_SESSION_SECRET`              Segredo aleatório longo usado para
-                                      proteger as sessões administrativas.
-  -----------------------------------------------------------------------
+**Importante:** os valores reais dessas variáveis devem ficar no arquivo `.env`. Não publique senhas nem chaves secretas no GitHub.
 
 **Por que existem duas senhas?** A conta administrativa serve para
 tarefas de configuração do banco. A aplicação usa uma conta separada,
