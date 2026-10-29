@@ -9,3 +9,15 @@
   object-position: center;
   margin: 0 auto;
 }
+
+/* Efeito de zoom suave nas imagens dos produtos */
+@media (hover: hover) and (pointer: fine) {
+  .product-image {
+    transition: transform 0.3s ease;
+    transform-origin: center center;
+  }
+
+  .product-image:hover {
+    transform: scale(1.08);
+  }
+}
