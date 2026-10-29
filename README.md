@@ -274,6 +274,47 @@ ADMIN_SESSION_SECRET=COLE_A_CHAVE_GERADA_AQUI
 Substitua `COLE_A_CHAVE_GERADA_AQUI` pela chave real, salve o arquivo
 (`Ctrl+S` no VS Code ou Bloco de Notas) e feche o editor.
 
+**Gerar a chave no Linux**
+
+Se você estiver usando Linux (Ubuntu/Debian, por exemplo), abra o terminal e execute:
+
+```bash
+openssl rand -hex 32
+```
+
+O comando gera uma chave aleatória de 32 bytes, representada por 64 caracteres hexadecimais.
+
+Copie o valor gerado e cole-o no arquivo `.env`, na linha `ADMIN_SESSION_SECRET=`, depois do sinal `=`.
+
+Exemplo:
+
+```env
+ADMIN_SESSION_SECRET=COLE_A_CHAVE_GERADA_AQUI
+```
+
+Substitua `COLE_A_CHAVE_GERADA_AQUI` pela chave real gerada no terminal. Não copie o texto ilustrativo.
+
+Se o comando apresentar `openssl: command not found`, instale o OpenSSL:
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt update
+sudo apt install openssl
+```
+
+Depois, execute novamente `openssl rand -hex 32`.
+
+Para editar o arquivo `.env` pelo terminal, estando na pasta do projeto, execute:
+
+```bash
+nano .env
+```
+
+Salve com `Ctrl+O`, pressione `Enter` e saia com `Ctrl+X`.
+
+**Importante:** não compartilhe essa chave, não a publique no GitHub e não a reutilize em outras instalações. Se você gerar uma nova chave para uma instalação que já está em uso, as sessões administrativas existentes poderão ser invalidadas.
+
 **Importante:** não envie a chave pelo chat, não a publique no GitHub e
 não a reutilize em outra instalação. Se gerar uma chave nova para uma
 instalação já em uso, as sessões administrativas existentes poderão ser
