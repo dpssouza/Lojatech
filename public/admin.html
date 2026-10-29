@@ -10,10 +10,6 @@
   <script src="/admin.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>LojaTech — Painel administrativo</h1>
-  </header>
-
   <main>
     <section id="loginSection" class="card login">
       <h2>Entrar</h2>
@@ -45,39 +41,29 @@
     </section>
 
     <section id="adminSection" class="hidden">
-      <div class="welcome-row">
-        <div>
-          <span class="eyebrow">VISÃO GERAL</span>
-          <h1>Gestão de produtos</h1>
-          <p class="hint">Gerencie seu catálogo, preços e disponibilidade em um só lugar.</p>
-        </div>
-        <div class="welcome-mark" aria-hidden="true">L</div>
-      </div>
-      <div class="card intro-card">
-        <div class="actions">
-          <div>
-            <span class="eyebrow">SEU CATÁLOGO</span>
-            <h2>Produtos</h2>
+      <div class="admin-shell">
+        <aside class="sidebar" aria-label="Menu administrativo">
+          <a class="brand" href="/admin" aria-label="LojaTech painel administrativo">
+            <span class="brand-mark" aria-hidden="true">L</span>
+            <span><strong class="brand-name">LojaTech</strong><small class="brand-subtitle">PAINEL ADMINISTRATIVO</small></span>
+          </a>
+          <div class="sidebar-label">MENU PRINCIPAL</div>
+          <nav class="admin-tabs" aria-label="Seções administrativas">
+            <button id="productsTab" type="button" class="tab-button active" aria-pressed="true"><span aria-hidden="true">▦</span> Gestão de produtos</button>
+            <button id="ordersTab" type="button" class="tab-button" aria-pressed="false"><span aria-hidden="true">▤</span> Gestão de pedidos</button>
+          </nav>
+          <div class="sidebar-footer">
+            <span class="admin-avatar" aria-hidden="true">A</span>
+            <span class="admin-user"><strong>Administrador</strong><small>LojaTech</small></span>
+            <button id="logoutButton" class="logout-button" type="button" aria-label="Sair do painel">↪</button>
           </div>
-          <button
-            id="logoutButton"
-            class="secondary"
-            type="button"
-          >
-            Sair
-          </button>
-        </div>
-
-        <p class="hint">
-          Cadastre produtos, edite informações e gerencie estoque e disponibilidade.
-        </p>
-      </div>
-
-      <nav class="admin-tabs" aria-label="Seções administrativas">
-        <button id="productsTab" type="button" class="tab-button active" aria-pressed="true">Gestão de produtos</button>
-        <button id="ordersTab" type="button" class="tab-button" aria-pressed="false">Gestão de pedidos</button>
-      </nav>
-
+        </aside>
+        <div class="admin-main">
+          <header class="topbar">
+            <div><span class="eyebrow">ÁREA ADMINISTRATIVA</span><h1>Painel de controle</h1></div>
+            <span class="admin-badge"><span class="status-dot"></span> Sistema operacional</span>
+          </header>
+          <div class="page-content">
       <div id="productManagement">
       <section class="stats-grid" id="dashboardStats" aria-label="Resumo do estoque">
         <article class="stat-card">
@@ -202,17 +188,7 @@
       </div>
       </div>
 
-      <section id="orderManagement" class="hidden" aria-labelledby="ordersHeading">
-        <div class="card intro-card">
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow">VENDAS</span>
-              <h2 id="ordersHeading">Gestão de pedidos</h2>
-            </div>
-            <button id="refreshOrdersButton" type="button" class="secondary">Atualizar lista</button>
-          </div>
-          <p class="hint">Consulte compras, veja os itens de cada pedido e atualize o andamento da entrega.</p>
-        </div>
+      <section id="orderManagement" class="hidden" aria-label="Gestão de pedidos">
         <section class="stats-grid" aria-label="Resumo dos pedidos">
           <article class="stat-card"><span class="stat-label">Total de pedidos</span><strong class="stat-value" id="totalOrders">—</strong><span class="stat-note">Todos os pedidos registrados</span></article>
           <article class="stat-card"><span class="stat-label">Pendentes</span><strong class="stat-value" id="pendingOrders">—</strong><span class="stat-note">Aguardando processamento</span></article>
@@ -220,21 +196,27 @@
         </section>
         <div class="card">
           <div class="orders-toolbar">
-            <label for="orderStatusFilter">Filtrar por status</label>
-            <select id="orderStatusFilter">
+            <div class="orders-filter">
+              <label for="orderStatusFilter">Filtrar por status</label>
+              <select id="orderStatusFilter">
               <option value="all">Todos os status</option>
               <option value="pending">Pendente</option>
               <option value="processing">Em preparação</option>
               <option value="shipped">Enviado</option>
               <option value="delivered">Entregue</option>
               <option value="cancelled">Cancelado</option>
-            </select>
+              </select>
+            </div>
+            <button id="refreshOrdersButton" type="button" class="secondary">Atualizar lista</button>
           </div>
           <p id="ordersMessage" class="message" role="status" aria-live="polite"></p>
           <div id="ordersList" class="table-scroll" aria-live="polite"></div>
         </div>
         <div id="orderDetails" class="card hidden" aria-live="polite"></div>
       </section>
+          </div><!-- /.page-content -->
+        </div><!-- /.admin-main -->
+      </div><!-- /.admin-shell -->
     </section>
   </main>
 </body>

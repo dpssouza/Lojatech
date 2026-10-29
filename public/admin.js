@@ -247,8 +247,96 @@ async function loadOrderDetails(id) {
   }
 }
 
+function showAdminDialog({
+  title = 'Confirmar ação',
+  message = '',
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
+  danger = false,
+  alertOnly = false
+} = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'admin-dialog-overlay';
+    overlay.setAttribute('role', 'presentation');
+
+    const dialog = document.createElement('section');
+    dialog.className = 'admin-dialog';
+    dialog.setAttribute('role', 'alertdialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-labelledby', 'adminDialogTitle');
+    dialog.setAttribute('aria-describedby', 'adminDialogMessage');
+
+    const icon = document.createElement('div');
+    icon.className = `admin-dialog-icon${danger ? ' is-danger' : ''}`;
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = danger ? '!' : (alertOnly ? 'i' : '?');
+
+    const heading = document.createElement('h2');
+    heading.id = 'adminDialogTitle';
+    heading.textContent = title;
+
+    const text = document.createElement('p');
+    text.id = 'adminDialogMessage';
+    text.textContent = message;
+
+    const actions = document.createElement('div');
+    actions.className = 'admin-dialog-actions';
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'admin-dialog-cancel';
+    cancel.textContent = cancelText;
+
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = `admin-dialog-confirm${danger ? ' is-danger' : ''}`;
+    confirm.textContent = alertOnly ? 'Entendi' : confirmText;
+
+    const finish = (result) => {
+      document.removeEventListener('keydown', onKeydown);
+      overlay.remove();
+      resolve(result);
+    };
+    const onKeydown = (event) => {
+      if (event.key === 'Escape' && !alertOnly) finish(false);
+      if (event.key === 'Escape' && alertOnly) finish(true);
+      if (event.key === 'Enter') finish(alertOnly ? true : document.activeElement === confirm);
+    };
+
+    if (!alertOnly) {
+      cancel.addEventListener('click', () => finish(false));
+      actions.appendChild(cancel);
+    }
+    confirm.addEventListener('click', () => finish(true));
+    actions.appendChild(confirm);
+    dialog.append(icon, heading, text, actions);
+    overlay.appendChild(dialog);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay && !alertOnly) finish(false);
+    });
+    document.addEventListener('keydown', onKeydown);
+    document.body.appendChild(overlay);
+    confirm.focus();
+  });
+}
+
+function confirmAdminAction(message, options = {}) {
+  return showAdminDialog({
+    title: options.title || 'Confirmar ação',
+    message,
+    confirmText: options.confirmText || 'Confirmar',
+    cancelText: options.cancelText || 'Cancelar',
+    danger: Boolean(options.danger)
+  });
+}
+
+function showAdminAlert(message, title = 'Não foi possível concluir') {
+  return showAdminDialog({ title, message, alertOnly: true, danger: true });
+}
+
 async function updateOrderStatus(order, status) {
-  if (status === 'cancelled' && !confirm(`Cancelar o pedido #${order.id}? O estoque dos itens será devolvido.`)) {
+  if (status === 'cancelled' && !(await confirmAdminAction(`Deseja cancelar o pedido #${order.id}? O estoque dos itens será devolvido automaticamente.`, { title: 'Cancelar pedido', confirmText: 'Sim, cancelar', danger: true }))) {
     renderOrders(); return;
   }
   try {
@@ -410,9 +498,10 @@ productForm.addEventListener('submit', async (event) => {
 async function toggleProduct(product) {
   const active = !product.active;
 
-  if (!confirm(
-    `Deseja ${active ? 'ativar' : 'desativar'} o produto "${product.name}"?`
-  )) {
+  if (!(await confirmAdminAction(
+    `Deseja ${active ? 'ativar' : 'desativar'} o produto "${product.name}"?`,
+    { title: active ? 'Ativar produto' : 'Desativar produto', confirmText: active ? 'Sim, ativar' : 'Sim, desativar', danger: !active }
+  ))) {
     return;
   }
 
@@ -432,7 +521,7 @@ async function toggleProduct(product) {
 
     await loadProducts();
   } catch (error) {
-    alert(error.message);
+    await showAdminAlert(error.message);
   }
 }
 
