@@ -11,6 +11,21 @@ const productList = document.getElementById('productList');
 const productId = document.getElementById('productId');
 const productMessage = document.getElementById('productMessage');
 const cancelEditButton = document.getElementById('cancelEdit');
+const productsTab = document.getElementById('productsTab');
+const ordersTab = document.getElementById('ordersTab');
+const productManagement = document.getElementById('productManagement');
+const orderManagement = document.getElementById('orderManagement');
+const ordersList = document.getElementById('ordersList');
+const ordersMessage = document.getElementById('ordersMessage');
+const orderDetails = document.getElementById('orderDetails');
+const orderStatusFilter = document.getElementById('orderStatusFilter');
+let orders = [];
+const orderStatusLabels = {
+  pending: 'Pendente', processing: 'Em preparação', shipped: 'Enviado',
+  delivered: 'Entregue', cancelled: 'Cancelado'
+};
+const currency = (value) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dateTime = (value) => new Date(value).toLocaleString('pt-BR');
 
 let csrfToken = '';
 let products = [];
@@ -86,12 +101,26 @@ function showLogin(message = '') {
 function showAdmin() {
   loginSection.classList.add('hidden');
   adminSection.classList.remove('hidden');
-
   loginSection.hidden = true;
   adminSection.hidden = false;
-
   loginMessage.textContent = '';
 }
+
+function showAdminTab(tab) {
+  const showOrders = tab === 'orders';
+  productManagement.classList.toggle('hidden', showOrders);
+  orderManagement.classList.toggle('hidden', !showOrders);
+  productsTab.classList.toggle('active', !showOrders);
+  ordersTab.classList.toggle('active', showOrders);
+  productsTab.setAttribute('aria-pressed', String(!showOrders));
+  ordersTab.setAttribute('aria-pressed', String(showOrders));
+  if (showOrders) loadOrders();
+}
+
+productsTab.addEventListener('click', () => showAdminTab('products'));
+ordersTab.addEventListener('click', () => showAdminTab('orders'));
+document.getElementById('refreshOrdersButton').addEventListener('click', loadOrders);
+orderStatusFilter.addEventListener('change', renderOrders);
 
 
 loginForm.addEventListener('submit', async (event) => {
@@ -116,12 +145,125 @@ loginForm.addEventListener('submit', async (event) => {
     loginForm.reset();
     showAdmin();
     await loadProducts();
+    await loadOrders();
   } catch (error) {
     loginMessage.textContent = error.message;
   } finally {
     button.disabled = false;
   }
 });
+
+async function loadOrders() {
+  ordersMessage.textContent = 'Carregando pedidos...';
+  try {
+    orders = await api('/api/admin/orders');
+    renderOrders();
+    document.getElementById('totalOrders').textContent = String(orders.length);
+    document.getElementById('pendingOrders').textContent = String(orders.filter(o => o.status === 'pending').length);
+    document.getElementById('activeOrders').textContent = String(orders.filter(o => ['processing', 'shipped'].includes(o.status)).length);
+    ordersMessage.textContent = orders.length ? '' : 'Ainda não há pedidos registrados.';
+  } catch (error) {
+    ordersMessage.textContent = error.message;
+  }
+}
+
+function renderOrders() {
+  ordersList.replaceChildren();
+  const filter = orderStatusFilter.value;
+  const visibleOrders = orders.filter(order => filter === 'all' || order.status === filter);
+  if (!visibleOrders.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'Nenhum pedido encontrado para este filtro.';
+    ordersList.appendChild(empty);
+    return;
+  }
+  const table = document.createElement('table');
+  const head = table.createTHead().insertRow();
+  ['Pedido', 'Data', 'Cliente', 'Itens', 'Total', 'Status', 'Ações'].forEach(label => {
+    const th = document.createElement('th'); th.textContent = label; head.appendChild(th);
+  });
+  const body = table.createTBody();
+  visibleOrders.forEach(order => {
+    const row = body.insertRow();
+    [`#${order.id}`, dateTime(order.created_at), order.customer_name, order.item_count, currency(order.total)].forEach(value => {
+      const cell = row.insertCell(); cell.textContent = String(value);
+    });
+    const statusCell = row.insertCell();
+    const badge = document.createElement('span');
+    badge.className = `status-badge status-${order.status}`;
+    badge.textContent = orderStatusLabels[order.status] || order.status;
+    statusCell.appendChild(badge);
+    const actions = row.insertCell();
+    const detailButton = document.createElement('button');
+    detailButton.type = 'button'; detailButton.textContent = 'Detalhes';
+    detailButton.addEventListener('click', () => loadOrderDetails(order.id));
+    actions.appendChild(detailButton);
+    if (!['delivered', 'cancelled'].includes(order.status)) {
+      const select = document.createElement('select');
+      select.className = 'inline-status-select';
+      select.setAttribute('aria-label', `Atualizar status do pedido ${order.id}`);
+      Object.entries(orderStatusLabels).forEach(([value, label]) => {
+        const option = document.createElement('option'); option.value = value; option.textContent = label;
+        option.selected = value === order.status; select.appendChild(option);
+      });
+      select.addEventListener('change', () => updateOrderStatus(order, select.value));
+      actions.appendChild(select);
+    }
+  });
+  ordersList.appendChild(table);
+}
+
+async function loadOrderDetails(id) {
+  orderDetails.classList.remove('hidden');
+  orderDetails.replaceChildren();
+  const loading = document.createElement('p'); loading.textContent = `Carregando pedido #${id}...`;
+  orderDetails.appendChild(loading);
+  try {
+    const order = await api(`/api/admin/orders/${encodeURIComponent(id)}`);
+    orderDetails.replaceChildren();
+    const heading = document.createElement('h2'); heading.textContent = `Detalhes do pedido #${order.id}`;
+    orderDetails.appendChild(heading);
+    const customer = document.createElement('p'); customer.textContent = `Cliente: ${order.customer_name} · E-mail: ${order.customer_email}`;
+    orderDetails.appendChild(customer);
+    const created = document.createElement('p'); created.textContent = `Data: ${dateTime(order.created_at)} · Status: ${orderStatusLabels[order.status] || order.status}`;
+    orderDetails.appendChild(created);
+    const table = document.createElement('table');
+    const head = table.createTHead().insertRow();
+    ['Produto', 'Quantidade', 'Preço unitário', 'Subtotal'].forEach(label => { const th = document.createElement('th'); th.textContent = label; head.appendChild(th); });
+    const body = table.createTBody();
+    order.items.forEach(item => {
+      const row = body.insertRow();
+      [item.product_name, item.quantity, currency(item.unit_price), currency(item.subtotal)].forEach(value => { const cell = row.insertCell(); cell.textContent = String(value); });
+    });
+    orderDetails.appendChild(table);
+    const total = document.createElement('p'); total.className = 'order-total'; total.textContent = `Total do pedido: ${currency(order.total)}`;
+    orderDetails.appendChild(total);
+    const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Fechar detalhes'; close.addEventListener('click', () => orderDetails.classList.add('hidden'));
+    orderDetails.appendChild(close);
+    orderDetails.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (error) {
+    orderDetails.replaceChildren(); const message = document.createElement('p'); message.textContent = error.message; orderDetails.appendChild(message);
+  }
+}
+
+async function updateOrderStatus(order, status) {
+  if (status === 'cancelled' && !confirm(`Cancelar o pedido #${order.id}? O estoque dos itens será devolvido.`)) {
+    renderOrders(); return;
+  }
+  try {
+    await api(`/api/admin/orders/${encodeURIComponent(order.id)}/status`, {
+      method: 'PATCH', body: JSON.stringify({ status })
+    });
+    await loadOrders();
+    ordersMessage.textContent = `Pedido #${order.id} atualizado para: ${orderStatusLabels[status]}.`;
+    if (!orderDetails.classList.contains('hidden')) await loadOrderDetails(order.id);
+    await loadProducts();
+  } catch (error) {
+    ordersMessage.textContent = error.message;
+    await loadOrders();
+  }
+}
 
 async function loadProducts() {
   try {
@@ -339,6 +481,7 @@ async function initializeAdmin() {
     if (data.authenticated) {
       showAdmin();
       await loadProducts();
+      await loadOrders();
     }
   } catch (error) {
     showLogin(error.message);

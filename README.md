@@ -1321,7 +1321,8 @@ LojaTech/
 │   ├── create-app-user.sh
 │   ├── create-app-user.sql
 │   └── migrations/
-│       └── 001_admin_panel.sql
+│       ├── 001_admin_panel.sql
+│       └── 002_order_management.sql
 ├── public/
 │   ├── index.html
 │   ├── styles.css
@@ -1385,6 +1386,35 @@ O arquivo `.env` é criado durante a configuração e não deve ser enviado
 ao GitHub. O `Caddyfile` é criado manualmente na EC2 apenas se você fizer a etapa
 opcional de HTTPS.
 Eles não são necessários para baixar e executar a aplicação localmente.
+
+## Gestão de pedidos no painel administrativo
+
+O painel administrativo também permite acompanhar os pedidos registrados pela loja.
+Depois de entrar em `/admin`, use **Gestão de pedidos** para:
+
+- consultar número, data, cliente, quantidade de itens, valor e status;
+- filtrar a lista pelo status;
+- abrir os detalhes e consultar os produtos, quantidades e preços;
+- atualizar o andamento para **Pendente**, **Em preparação**, **Enviado** ou **Entregue**;
+- cancelar um pedido. Ao cancelar, o sistema devolve ao estoque as quantidades compradas, dentro da mesma transação do banco de dados.
+
+Os status são operacionais; esta funcionalidade não confirma nem processa pagamentos. Pedidos antigos recebem o status `pending` (Pendente) ao aplicar a migração. Pedidos entregues ou cancelados não podem ser reabertos pela interface.
+
+### Atualizar uma instalação que já existe
+
+As migrações em `/docker-entrypoint-initdb.d` são executadas automaticamente somente quando o PostgreSQL inicializa um volume de dados vazio. Se a LojaTech já está rodando com um banco existente, aplique a nova migração **antes de usar a gestão de pedidos**. Na pasta do projeto, execute:
+
+```bash
+docker compose exec -T db sh -c 'psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set=ON_ERROR_STOP=1 --set=app_user="$APP_DB_USER" --file=/scripts/migrations/002_order_management.sql'
+```
+
+Esse comando adiciona a coluna de status, cria índices e ajusta as permissões do usuário da aplicação. Ele não apaga pedidos nem produtos. Em seguida, reconstrua e reinicie a aplicação:
+
+```bash
+docker compose up -d --build app
+```
+
+Se você usa o arquivo de composição de teste, acrescente `-f docker-compose.teste.yml` aos comandos `docker compose` acima. Faça backup do banco antes de executar alterações em uma instalação importante.
 
 ## Referências oficiais
 

@@ -529,6 +529,111 @@ function createAdminRouter(pool) {
     }
   });
 
+  // Gestão de pedidos: consulta protegida pela sessão administrativa.
+  router.get('/orders', requireAuth, async (req, res, next) => {
+    try {
+      const result = await pool.query(
+        `SELECT o.id, o.customer_name, o.customer_email, o.total,
+                o.status, o.created_at,
+                COUNT(oi.id)::integer AS item_count
+         FROM orders o
+         LEFT JOIN order_items oi ON oi.order_id = o.id
+         GROUP BY o.id
+         ORDER BY o.created_at DESC, o.id DESC`
+      );
+      res.set('Cache-Control', 'no-store');
+      res.json(result.rows);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get('/orders/:id', requireAuth, async (req, res, next) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        return res.status(400).json({ error: 'ID de pedido inválido.' });
+      }
+      const orderResult = await pool.query(
+        `SELECT id, customer_name, customer_email, total, status, created_at
+         FROM orders WHERE id = $1`, [id]
+      );
+      if (!orderResult.rowCount) {
+        return res.status(404).json({ error: 'Pedido não encontrado.' });
+      }
+      const itemsResult = await pool.query(
+        `SELECT oi.product_id, COALESCE(p.name, 'Produto removido') AS product_name,
+                oi.quantity, oi.unit_price,
+                (oi.quantity * oi.unit_price)::numeric(10,2) AS subtotal
+         FROM order_items oi
+         LEFT JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id = $1 ORDER BY oi.id`, [id]
+      );
+      res.set('Cache-Control', 'no-store');
+      res.json({ ...orderResult.rows[0], items: itemsResult.rows });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.patch('/orders/:id/status', requireAuth, requireCsrf, async (req, res, next) => {
+    const id = Number(req.params.id);
+    const { status } = req.body || {};
+    const allowedStatuses = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      return res.status(400).json({ error: 'ID de pedido inválido.' });
+    }
+    if (!allowedStatuses.has(status)) {
+      return res.status(400).json({ error: 'Status de pedido inválido.' });
+    }
+
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query('BEGIN');
+      const currentResult = await client.query(
+        'SELECT id, status FROM orders WHERE id = $1 FOR UPDATE', [id]
+      );
+      if (!currentResult.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Pedido não encontrado.' });
+      }
+      const current = currentResult.rows[0];
+      if (current.status === 'delivered' && status !== 'delivered') {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Um pedido entregue não pode ter o status alterado.' });
+      }
+      if (current.status === 'cancelled' && status !== 'cancelled') {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: 'Um pedido cancelado não pode ser reaberto por esta tela.' });
+      }
+      // O estoque só é devolvido na primeira transição para cancelado.
+      if (status === 'cancelled' && current.status !== 'cancelled') {
+        const items = await client.query(
+          'SELECT product_id, quantity FROM order_items WHERE order_id = $1', [id]
+        );
+        for (const item of items.rows) {
+          await client.query(
+            'UPDATE products SET stock = stock + $1 WHERE id = $2',
+            [item.quantity, item.product_id]
+          );
+        }
+      }
+      const updated = await client.query(
+        'UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status', [status, id]
+      );
+      await client.query('COMMIT');
+      res.json(updated.rows[0]);
+    } catch (err) {
+      if (client) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+      }
+      next(err);
+    } finally {
+      if (client) client.release();
+    }
+  });
+
   return router;
 }
 
